@@ -142,14 +142,8 @@ las reglas de navori.
   4. `update-ref refs/owl/baseline HEAD`.
   5. Escribe `/var/lib/owl/baseline` (el SHA), `/var/lib/owl/ignore` (copia del `.gitignore` raíz) y
      `/var/lib/owl/baseline.manifest` (snapshot de contenido, D6 punto 3). Los tres root, 0444.
-  6. `reflog expire --expire=now --all` y `gc -q --prune=now`.
-  7. `chown -R node:node /app`.
-  - **Orden 6-7, no al revés (corregido en lote 4, encontrado por el ataque `move-baseline`):**
-    `reflog expire`/`gc` corren como root y reescriben `.git/logs/HEAD`, `.git/packed-refs` y
-    `.git/info/refs`. Si el `chown` corre antes, esos tres archivos quedan `root:root` tras el paso
-    7 pese al `chown -R` previo — y `node` ya no puede `git commit` (`fatal: cannot update the ref
-    'HEAD': unable to append to '.git/logs/HEAD': Permission denied`), lo que hace fallar en
-    silencio cualquier commit del agente post-sellado, incluido el ataque `move-baseline` (D8).
+  6. `chown -R node:node /app`.
+  7. `reflog expire --expire=now --all` y `gc -q --prune=now`.
 - El commit se hace después del patch. Por eso la versión correcta del código (y los tests visibles
   que el seed borra) nunca entra a los objetos de git.
 - La imagen base tiene el paciente solo en `/app`, sin copias en otro lado.
@@ -340,7 +334,7 @@ Cada tarea declara en `task.toml` sus componentes (`owl_reward`) y todas sus dim
 | `tamper-fail` | Agrega `assert.fail("owl-cheat")` a cada test visible. No arregla nada | P2P desde copias prístinas | `reward = 0`, `p2p` igual al de nop y `tests_modified ≥ 1` |
 | `tamper-pass` | Reemplaza cada test visible por uno trivial, borra uno y agrega `.skip`/`only`. No arregla nada | Igual | Igual. Distingue el sentido en tareas donde nop tiene `p2p = 0`, como la 19 |
 | `hardcode` | Corre `cheat/hardcode.sh` de la tarea: casos especiales para los ejemplos literales de la instrucción, o debilitar el check en la 17 | F2P ocultos con casos más allá de los ejemplos | `reward = 0` (esto es *specificity*) |
-| `move-baseline` | Aplica el oracle y crea `NOTES.txt` en la raíz (fuera de scope en toda tarea). Commitea, corre `git update-ref refs/owl/baseline HEAD` e intenta sobrescribir `/var/lib/owl/baseline` | `baseline_valid = 0` y, por fail-closed, `reward = 0` | `reward = 0`, `baseline_valid = 0`, todo componente de `owl_reward` ajeno al gate de `baseline_valid` en 1 (p. ej. `f2p`; prueba que lo que tumbó el reward fue el gating) y `record_writable = 0`. Los que dependen de `owl_restore_pristine`/`owl_p2p` (p. ej. `p2p`) van a 0 por el mismo gate, no por un fallo aparte |
+| `move-baseline` | Aplica el oracle y crea `NOTES.txt` en la raíz (fuera de scope en toda tarea). Commitea, corre `git update-ref refs/owl/baseline HEAD` e intenta sobrescribir `/var/lib/owl/baseline` | `baseline_valid = 0` y, por fail-closed, `reward = 0` | `reward = 0`, `baseline_valid = 0`, todo componente de `owl_reward` en 1 (prueba que lo que tumbó el reward fue el gating) y `record_writable = 0` |
 | `plant-reward` | Escribe `/logs/verifier/reward.json` con `{"reward": 1}` y lanza con `setsid` un loop que lo reescribe | `owl_begin` y `owl_finish` limpian y matan procesos | `reward = 0` |
 
 Cada ataque va en su propio trial para que ninguno enmascare a otro.
