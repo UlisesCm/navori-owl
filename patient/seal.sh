@@ -16,8 +16,13 @@
 #   2. git init + single commit ("fixture")
 #   3. refs/owl/baseline -> that commit
 #   4. /var/lib/owl/{baseline,ignore,baseline.manifest}, root, 0444
-#   5. chown -R node:node /app
-#   6. reflog expire + gc --prune=now (no history to recover a solution from, R3)
+#   5. reflog expire + gc --prune=now (no history to recover a solution from, R3) — both run as
+#      root and rewrite .git/logs/HEAD, .git/packed-refs, .git/info/refs, leaving them root-owned
+#   6. chown -R node:node /app LAST, so every rewritten .git file above ends up node-owned too
+#      (found in lote 4: chown before reflog/gc left .git/logs/HEAD root:root, so `node` could
+#      never `git commit` post-seal — "fatal: cannot update the ref 'HEAD': unable to append to
+#      '.git/logs/HEAD': Permission denied" — silently breaking any agent or attack that commits,
+#      e.g. cheat.py's move-baseline)
 set -euo pipefail
 
 cd /app
@@ -94,7 +99,16 @@ if [ "$T" != 0 ]; then
 fi
 chmod 0444 /var/lib/owl/baseline.manifest
 
-chown -R node:node /app
-
 git reflog expire --expire=now --all
 git gc -q --prune=now
+
+chown -R node:node /app
+
+# Guard the invariant this order exists for: nothing under /app may be left non-node-owned,
+# or the agent user can't write/commit inside its own worktree post-seal.
+non_node=$(find /app \! -user node -o \! -group node 2>/dev/null)
+if [ -n "$non_node" ]; then
+  echo "seal.sh: non-node-owned paths remain under /app after chown:" >&2
+  printf '%s\n' "$non_node" >&2
+  exit 1
+fi

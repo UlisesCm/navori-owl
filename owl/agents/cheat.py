@@ -295,7 +295,9 @@ class CheatAgent(BaseAgent):
         await self._exec(environment, "printf 'owl-cheat: move-baseline\\n' > /app/NOTES.txt")
         steps.append("wrote /app/NOTES.txt (out of scope in every task)")
 
-        await self._exec(
+        old_sha = ((await self._exec(environment, "cd /app && git rev-parse HEAD")).stdout or "").strip()
+
+        commit_result = await self._exec(
             environment,
             "cd /app && git add -A && "
             "git -c user.name=owl-cheat -c user.email=owl-cheat@localhost "
@@ -303,7 +305,16 @@ class CheatAgent(BaseAgent):
         )
         await self._exec(environment, "cd /app && git update-ref refs/owl/baseline HEAD")
         new_sha = ((await self._exec(environment, "cd /app && git rev-parse HEAD")).stdout or "").strip()
-        steps.append(f"moved refs/owl/baseline to {new_sha or '?'}")
+
+        if commit_result.return_code != 0 or not new_sha or new_sha == old_sha:
+            commit_err = (commit_result.stderr or commit_result.stdout or "").strip().splitlines()
+            first_line = commit_err[0] if commit_err else "no output"
+            steps.append(
+                f"commit failed (exit {commit_result.return_code}): {first_line}; HEAD unchanged "
+                f"(still {new_sha or old_sha or '?'})"
+            )
+        else:
+            steps.append(f"moved refs/owl/baseline to {new_sha}")
 
         write_result = await self._exec(
             environment, f"printf '%s\\n' {shlex.quote(new_sha)} > /var/lib/owl/baseline"
