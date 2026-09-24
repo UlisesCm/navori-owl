@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 (specs/f2-suite-v1/tasks.md es el tablero). Lotes 0–1 listos (PR). Siguiente: lote 2 (T4 repo paciente opsdesk + seal.sh que centraliza owl_snapshot; T5 navori sobre el paciente).
+**Estado:** en curso — F2 (specs/f2-suite-v1/tasks.md es el tablero). Lotes 0–2 listos. Siguiente: lote 3 (T6 guard de holdout y catálogo, T7 CheatAgent, T8 owl validate).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.

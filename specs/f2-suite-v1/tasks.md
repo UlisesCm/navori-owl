@@ -33,12 +33,14 @@ Presupuesto de modelo: solo T0 (~$0.40) y T17 (~$1–2, Haiku). Todo lo demás e
 
 ## Lote 2 — Repo paciente
 
-- [ ] **T4** (R1, R2, R3) — `patient/` (`opsdesk`, D1–D3): workspaces, `CLAUDE.md` base con
-  convenciones marcador, `docs/`, suite visible en verde, `patient/Dockerfile` (`owl-patient:local`
-  fijado por digest) y `patient/seal.sh` (commit único, sin remotos, tags ni reflog; baseline
-  registrado) · test: `tests/test_validate_docker.py::patient_sealed` (una sola raíz, sin reflog,
-  canary presente), `# Covers: R1, R2, R3`.
-- [ ] **T5** (R1) — `variants/navori.yaml#harness.init` con la ruta que decidió T0 y su línea
+- [x] **T4** (R1, R2, R3) — `patient/` (`opsdesk`, D1–D3): workspaces, `CLAUDE.md`/`AGENTS.md`
+  base con convenciones marcador (agent-neutrality), `docs/`, suite visible en verde,
+  `patient/Dockerfile` (`owl-patient:local` fijado por digest) y `patient/seal.sh` (commit único,
+  sin remotos, tags ni reflog; baseline registrado) · test:
+  `tests/test_validate_docker.py::test_patient_sealed` (una sola raíz, sin reflog, canary
+  presente, suite y typecheck en verde), `tests/test_patient_docs.py` (sin Docker), `# Covers: R1,
+  R2, R3`.
+- [x] **T5** (R1) — `variants/navori.yaml#harness.init` con la ruta que decidió T0 y su línea
   centinela; la ruta queda declarada en el manifiesto para la divulgación de F3 (D13) · test:
   `tests/test_validate_docker.py::navori_install_on_patient` (sin modelo: corre el `init` y verifica
   `.claude/`, `.mcp.json` y el `CLAUDE.md` base), `# Covers: R1`.
