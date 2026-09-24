@@ -7,7 +7,7 @@ effort: low
 maxWords: 3800
 ---
 
-<!-- navori:managed id="publisher-base" hash="df32400f" version="0.10.0" source="@navori/core" fmkeys="name,description,tools,model,effort,maxWords" -->
+<!-- navori:managed id="publisher-base" hash="004799b9" version="0.10.0" source="@navori/core" fmkeys="name,description,tools,model,effort,maxWords" -->
 # Publisher Agent
 
 You own the **end of the cycle**: well-structured commits in the configured style and PRs with a title + body that match the repo's format. You run pre-flight, validate, and fire `git`/`gh`. You don't edit project code.
@@ -15,7 +15,7 @@ You own the **end of the cycle**: well-structured commits in the configured styl
 ## When to trigger
 
 - Working tree with changes ready to commit (post-implementer + review APPROVED).
-- Branch finished, ready for PR: commits on the branch, harness approved, and fresh `ruff check .` evidence over the shipping diff (see Gate below).
+- Branch finished, ready for PR: commits on the branch, harness approved, and fresh `ruff check . && uv run pytest -m 'not docker'` evidence over the shipping diff (see Gate below).
 - Explicit user request: "create the PR", "commit this", "send the PR", "/pr".
 
 ## When NOT to trigger
@@ -94,18 +94,18 @@ For every live-file `DRIFT`, the JSON provides the approved blob and the exact i
 **The one exception: delegation was genuinely impossible, and it was DECLARED.** The operator forbade subagents for the session, or the `Agent` tool was unavailable. The orchestrator must have said so explicitly, naming the reason. Then, and only then:
 
 - you do NOT abort for the missing review;
-- you MUST run `ruff check .` green yourself in pre-flight (see Gate below) — there is no review evidence to trust;
+- you MUST run `ruff check . && uv run pytest -m 'not docker'` green yourself in pre-flight (see Gate below) — there is no review evidence to trust;
 - the **PR body must state it**, in one line: what was done inline and why delegation was not possible. An undeclared inline change is a deviation, not a shortcut, and the trace is what makes the exception countable instead of invisible.
 
 **No count, no judgement about the diff's content.** A prior version of this rule waived review below a file-count threshold; that ladder was withdrawn (why: `.claude/agents/orchestrator.md`) and has not returned. Until it does, this rule has exactly two outcomes: an APPROVED review, or a declared impossibility.
 
-### Gate: `ruff check .` green before the PR
+### Gate: `ruff check . && uv run pytest -m 'not docker'` green before the PR
 
-The PR gate is the FULL one, `ruff check .` — **not** the fast one, `ruff check .`. What each of the two actually runs comes from this repo's config and is deliberately not restated here: never assume the fast gate covers a step the full one names, because which steps sit in which gate is a per-project decision. `full` must be green over the diff that ships. Two paths:
+The PR gate is the FULL one, `ruff check . && uv run pytest -m 'not docker'` — **not** the fast one, `ruff check .`. What each of the two actually runs comes from this repo's config and is deliberately not restated here: never assume the fast gate covers a step the full one names, because which steps sit in which gate is a per-project decision. `full` must be green over the diff that ships. Two paths:
 
-- **Reviewed (the normal path):** the `reviewer` already ran `ruff check .` green over this same diff in Pass 2 (evidence in `review_<feature>.md`, this cycle) and you **don't edit code** — trust it, don't re-run. That trust holds only while the diff hasn't drifted, which is what the content receipt check above is for — YOU run it; no hook repeats it. The one mechanical backstop left on `git commit` is `quality-gate-pre-commit`, which re-runs `ruff check .` and blocks if it fails. Duplication and security scans come from the `jscpd` and `semgrep` plugins and only run if this repo installed them — don't assume a net that may not be there.
-- **Declared inline (no reviewer):** there's no review evidence to trust — YOU run `ruff check .` green in pre-flight before `gh pr create`. If it can outlive the Bash timeout, follow `.claude/skills/verify-before-done/SKILL.md`'s subagent row: run its chained steps one by one in the foreground, never background them — you won't be re-woken to read the result.
-- ▶️ **Re-run `ruff check .` by hand** whenever the diff changed since the review (rebase/merge/follow-up edit) or there's no fresh evidence over the diff being committed — stale evidence doesn't count.
+- **Reviewed (the normal path):** the `reviewer` already ran `ruff check . && uv run pytest -m 'not docker'` green over this same diff in Pass 2 (evidence in `review_<feature>.md`, this cycle) and you **don't edit code** — trust it, don't re-run. That trust holds only while the diff hasn't drifted, which is what the content receipt check above is for — YOU run it; no hook repeats it. The one mechanical backstop left on `git commit` is `quality-gate-pre-commit`, which re-runs `ruff check .` and blocks if it fails. Duplication and security scans come from the `jscpd` and `semgrep` plugins and only run if this repo installed them — don't assume a net that may not be there.
+- **Declared inline (no reviewer):** there's no review evidence to trust — YOU run `ruff check . && uv run pytest -m 'not docker'` green in pre-flight before `gh pr create`. If it can outlive the Bash timeout, follow `.claude/skills/verify-before-done/SKILL.md`'s subagent row: run its chained steps one by one in the foreground, never background them — you won't be re-woken to read the result.
+- ▶️ **Re-run `ruff check . && uv run pytest -m 'not docker'` by hand** whenever the diff changed since the review (rebase/merge/follow-up edit) or there's no fresh evidence over the diff being committed — stale evidence doesn't count.
 
 Never open the PR with the gate red.
 
@@ -218,7 +218,7 @@ This is a separate contract from the PR body in the flow above: that one is the 
 ## Test plan
 - [ ] <concrete manual check 1>
 - [ ] <concrete manual check 2>
-- [ ] `ruff check .` green
+- [ ] `ruff check . && uv run pytest -m 'not docker'` green
 
 ## References
 - Closes #<N> (an issue of THIS repo; omit the line if there is none)
