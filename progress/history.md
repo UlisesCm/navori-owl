@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-24 09:40 orchestrator — Soporte Codex en owl y primeras corridas reales
+- Cambios: owl/cli.py (agente codex de Harbor, modelo por agente, auth de suscripción para ambos), owl/gate.py (gate por agente; plugins builtin aparte), variants/codex-default.yaml, README (uso), VISION §13.
+- Quality gate: ✅ ruff check . verde (reviewer Pass 2, APPROVED).
+- Notas: corridas mínimas 00-smoke k=1: vanilla-default reward=1 ($0.04) y codex-default reward=1, ambas PASS. `agents-md@builtin` viene con Claude Code 2.1.281 y no es contaminación. Harbor codex no acepta `--ak variant_id`. El costo de gpt-6-luna ($0.0012) parece artefacto de la tabla de precios; la rama de error del gate de Codex no se ha visto con un log real.
+- Commit / PR: branch feat/codex-agent
+
 ## 2026-09-23 23:58 orchestrator — Esqueleto F0 revisado y publicado; OTel movido a F4
 - Cambios: owl/ (runner, gate, variantes, subclase ClaudeCodeHarness), tasks/00-smoke y 01-probe, variants/*.yaml, pyproject/uv.lock, VISION §5/§8/§13.
 - Quality gate: ✅ ruff check . verde (reviewer Pass 2, APPROVED tras una ronda de CHANGES_REQUESTED).

@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** pausado — F0 (spike Harbor). Siguiente paso: el usuario crea `.env` con `CLAUDE_CODE_OAUTH_TOKEN` y se corre la ronda real.
+**Estado:** pausado — F0 (spike Harbor). Siguiente paso: validar con datos reales las variantes con plugin (superpowers, ponytail) y el probe 01, con presupuesto mínimo (el usuario tiene pocos tokens).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
@@ -10,9 +10,11 @@ Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas 
 - [x] Confirmar /tests oculto durante la fase del agente (oracle probe: tests_dir_exists=false)
 - [x] `ruff check .` verde (implementer → reviewer)
 - [x] Review completo del esqueleto `owl/` + `tasks/` antes del primer commit
-- [ ] `.env` con `CLAUDE_CODE_OAUTH_TOKEN` (lo genera el usuario con `claude setup-token`)
-- [ ] Corrida real: vanilla-default + superpowers + ponytail × 00-smoke + 01-probe, k=1, Haiku
-- [ ] `owl gate jobs/` sobre esas corridas; ajustar el gate con datos reales
+- [x] `.env` con `CLAUDE_CODE_OAUTH_TOKEN` (validar gratis con curl a /v1/models)
+- [x] Corrida real mínima: vanilla-default y codex-default × 00-smoke, k=1 → ambas PASS
+- [ ] Corrida real de superpowers + ponytail y del probe 01 (una a la vez, k=1)
+- [x] Gate ajustado con datos reales: plugins `builtin` aparte; eventos de Codex confirmados
+- [x] Baseline Codex (`codex-default`, suscripción ChatGPT) adelantado de F5
 - [x] OTel fuera de F0 → F4 (confirmado por el usuario; VISION §5 y §13 actualizados)
 - [x] Commit del esqueleto en branch `feat/f0-harbor-spike` + PR a `main`
 

@@ -1,0 +1,9 @@
+# Baseline: Codex CLI exactly as shipped. Nothing is added; the fixture has no .codex/ config.
+id: codex-default
+description: Codex CLI sin harness, modo por defecto (auto-discovery activo).
+agent: codex
+agent_version: "0.156.1"
+harness: {}
+expect:
+  plugins: []
+  mcp_servers: []

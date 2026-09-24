@@ -1,9 +1,16 @@
 """Contamination gate: prove each trial loaded exactly what its variant declared.
 
-Reads the Claude Code stream-json log of every trial (``agent/claude-code.txt``) and checks:
-- ``system/init``: loaded plugins and MCP servers match the manifest's ``expect`` block.
-- the run reached the model: a ``result`` event exists, is not an error, and used tokens.
-- for the isolation probe task: the oracle directory was not visible to the agent.
+Dispatches by the variant's ``agent``:
+- ``claude-code``: reads the stream-json log (``agent/claude-code.txt``) and checks
+  ``system/init`` plugins/MCP servers against the manifest's ``expect`` block, plus a
+  ``result`` event that is not an error and used tokens.
+- ``codex``: reads the ``codex exec --json`` log (``agent/codex.txt``) and checks there is
+  no ``error``/``turn.failed`` event and a ``turn.completed`` event that used tokens.
+  Plugin/MCP ``expect`` is not verifiable from this log (Codex has no harness yet).
+
+Both agents share:
+- cost/tokens, read from the trial's Harbor ``result.json`` (``agent_result``) when present.
+- for the isolation probe task: the oracle directory was not visible to the agent (``reward.json``).
 """
 
 from __future__ import annotations
@@ -20,6 +27,7 @@ class TrialGate:
     passed: bool
     reasons: list[str] = field(default_factory=list)
     plugins: list[str] = field(default_factory=list)
+    builtin_plugins: list[str] = field(default_factory=list)
     mcp_servers: list[str] = field(default_factory=list)
     cost_usd: float | None = None
     num_turns: int | None = None
@@ -38,17 +46,12 @@ def _events(log: Path) -> list[dict]:
     return events
 
 
-def check_trial(trial_dir: Path, variant: dict) -> TrialGate:
-    gate = TrialGate(trial=trial_dir.name, variant=variant["id"], passed=True)
-    reward_file = trial_dir / "verifier" / "reward.json"
-    if reward_file.is_file():
-        gate.reward = json.loads(reward_file.read_text())
-
+def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict) -> None:
     log = trial_dir / "agent" / "claude-code.txt"
     if not log.is_file():
         gate.passed = False
         gate.reasons.append("no claude-code.txt: agent never started")
-        return gate
+        return
 
     events = _events(log)
     init = next((e for e in events if e.get("type") == "system" and e.get("subtype") == "init"), None)
@@ -58,7 +61,13 @@ def check_trial(trial_dir: Path, variant: dict) -> TrialGate:
         gate.passed = False
         gate.reasons.append("no system/init event")
     else:
-        gate.plugins = sorted(p.get("name", "?") for p in init.get("plugins") or [])
+        all_plugins = init.get("plugins") or []
+        # Plugins Claude Code ships internally (e.g. "agents-md") aren't harness contamination:
+        # they load with path == "builtin" / source == "<name>@builtin" regardless of the variant.
+        builtin = [p for p in all_plugins if p.get("path") == "builtin" or str(p.get("source", "")).endswith("@builtin")]
+        loaded = [p for p in all_plugins if p not in builtin]
+        gate.plugins = sorted(p.get("name", "?") for p in loaded)
+        gate.builtin_plugins = sorted(p.get("name", "?") for p in builtin)
         mcp_servers = init.get("mcp_servers") or []
         gate.mcp_servers = sorted(s.get("name", "?") for s in mcp_servers)
         expect = variant.get("expect") or {}
@@ -91,6 +100,80 @@ def check_trial(trial_dir: Path, variant: dict) -> TrialGate:
         if not tokens:
             gate.passed = False
             gate.reasons.append("zero tokens used: never reached the model")
+
+
+def _check_codex(gate: TrialGate, trial_dir: Path, variant: dict) -> None:
+    log = trial_dir / "agent" / "codex.txt"
+    if not log.is_file():
+        gate.passed = False
+        gate.reasons.append("no codex.txt: agent never started")
+        return
+
+    expect = variant.get("expect") or {}
+    if expect.get("plugins") or expect.get("mcp_servers"):
+        gate.passed = False
+        gate.reasons.append("plugins/mcp_servers expectation not verifiable for agent 'codex' (no harness yet)")
+
+    events = _events(log)
+    errors = [e for e in events if e.get("type") in ("error", "turn.failed")]
+    if errors:
+        gate.passed = False
+        for error in errors:
+            detail = error.get("error") or error.get("message") or error
+            gate.reasons.append(f"{error.get('type')}: {str(detail)[:160]}")
+
+    completed = [e for e in events if e.get("type") == "turn.completed"]
+    if not completed:
+        gate.passed = False
+        gate.reasons.append("no turn.completed event: run did not finish")
+        return
+
+    gate.num_turns = len(completed)
+    usage = completed[-1].get("usage") or {}
+    tokens = sum(v for v in usage.values() if isinstance(v, (int, float)))
+    if not tokens:
+        gate.passed = False
+        gate.reasons.append("zero tokens used: never reached the model")
+
+
+_AGENT_CHECKS = {
+    "claude-code": _check_claude_code,
+    "codex": _check_codex,
+}
+
+
+def _overlay_cost_from_result_json(gate: TrialGate, trial_dir: Path) -> None:
+    """Prefer Harbor's own token/cost accounting (``result.json``) when present.
+
+    It's agent-agnostic and the source Harbor itself uses for its own reports, unlike the
+    per-agent log which each agent formats differently (or not at all, for tokens/cost).
+    """
+    result_file = trial_dir / "result.json"
+    if not result_file.is_file():
+        return
+    try:
+        agent_result = json.loads(result_file.read_text()).get("agent_result") or {}
+    except json.JSONDecodeError:
+        return
+    if agent_result.get("cost_usd") is not None:
+        gate.cost_usd = agent_result["cost_usd"]
+
+
+def check_trial(trial_dir: Path, variant: dict) -> TrialGate:
+    gate = TrialGate(trial=trial_dir.name, variant=variant["id"], passed=True)
+    reward_file = trial_dir / "verifier" / "reward.json"
+    if reward_file.is_file():
+        gate.reward = json.loads(reward_file.read_text())
+
+    agent = variant.get("agent", "claude-code")
+    check = _AGENT_CHECKS.get(agent)
+    if check is None:
+        gate.passed = False
+        gate.reasons.append(f"gate: agent '{agent}' not supported")
+    else:
+        check(gate, trial_dir, variant)
+
+    _overlay_cost_from_result_json(gate, trial_dir)
 
     if gate.reward and gate.reward.get("solution_hidden") == 0:
         gate.passed = False
