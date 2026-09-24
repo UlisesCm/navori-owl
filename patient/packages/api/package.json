@@ -1,0 +1,11 @@
+{
+  "name": "@opsdesk/api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@opsdesk/core": "*",
+    "@opsdesk/db": "*"
+  }
+}

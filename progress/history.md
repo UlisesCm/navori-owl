@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-24 14:40 orchestrator — F2 lote 2: repo paciente opsdesk y navori sobre el paciente
+- Cambios: patient/ (opsdesk: workspaces core/db/api/cli/legacy-sdk sobre node:sqlite, 23 tests visibles, CLAUDE.md + AGENTS.md idénticos, Dockerfile owl-patient:local por digest, seal.sh), variants/navori.yaml (init --yes + render --apply + centinelas), tests (test_patient_docs.py, test_patient_sealed, test_navori_install_on_patient), specs D2/D3/D13.
+- Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (reviewer Pass 2, APPROVED en ciclo 2; 17 docker verdes).
+- Notas: AGENTS.md agregado por neutralidad de agentes (Codex ya comparable en convenciones). El review quitó `canManageComments` del paciente (resolvía por adelantado la decisión de seguridad de la tarea 16). Excepción documentada: POST /incidents sin idempotencia (tarea 18). Pendiente de decisión: la inyección de la tarea 13 como canary inofensivo en su seed.patch (el clasificador bloqueó una inyección realista).
+- Commit / PR: branch feat/f2-lote2-patient
+
 ## 2026-09-24 12:45 orchestrator — F2 lotes 0–1: spec, spike e integridad del verifier
 - Cambios: specs/f2-suite-v1/ (requirements R1–R17, design D1–D15, tasks T0–T17, spike.md); owl/verifier/lib.sh (nuevo: compara contenido contra manifiesto root-owned, git endurecido solo para baseline_valid, limpia /logs/verifier y mata procesos del agente); tasks/00-smoke migrada (agente no-root, /var/lib/owl/{baseline,baseline.manifest,ignore}); ClaudeCodeHarness refresca registro y manifiesto como root; owl/gate.py (baseline_valid=0 → contamination, verifier_complete=0 → infra); pytest en el quality gate; tests/ (5 unit + 15 docker opt-in); render de navori con el gate nuevo.
 - Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (reviewer Pass 2, APPROVED en el ciclo 3).

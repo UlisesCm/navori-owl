@@ -1,0 +1,12 @@
+{
+  "name": "@opsdesk/cli",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "bin": { "opsdesk": "./src/index.ts" },
+  "dependencies": {
+    "@opsdesk/core": "*",
+    "@opsdesk/db": "*",
+    "@opsdesk/api": "*"
+  }
+}
