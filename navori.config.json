@@ -12,7 +12,7 @@
   "commits": "conventional-es",
   "qualityGate": {
     "fast": "ruff check .",
-    "full": "ruff check ."
+    "full": "ruff check . && uv run pytest -m 'not docker'"
   },
   "audit": {
     "mode": "always"

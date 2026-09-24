@@ -184,6 +184,12 @@ def check_trial(trial_dir: Path, variant: dict) -> TrialGate:
     if gate.reward and gate.reward.get("solution_hidden") == 0:
         _fail(gate, "agent could see /solution", "contamination")
 
+    if gate.reward and gate.reward.get("baseline_valid") == 0:
+        _fail(gate, "baseline moved or missing", "contamination")
+
+    if gate.reward and gate.reward.get("verifier_complete") == 0:
+        _fail(gate, "verifier_complete=0: verifier did not finish", "infra")
+
     return gate
 
 
