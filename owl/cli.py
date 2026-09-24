@@ -32,9 +32,10 @@ ENV_FILE = ROOT / ".env"
 def _harbor_command(variant: Variant, task: Path, job_name: str, jobs_dir: Path, model: str) -> list[str]:
     if variant.agent not in AGENT_IMPORT_PATHS:
         raise SystemExit(f"Variant {variant.id}: agent '{variant.agent}' not supported yet (F5).")
-    if variant.agent == "codex" and (variant.plugins or variant.init or variant.bare):
+    if variant.agent == "codex" and (variant.plugins or variant.init or variant.bare or variant.runtime_state):
         raise SystemExit(
-            f"Variant {variant.id}: harness plugins/init/bare are not supported for agent 'codex' yet (F5)."
+            f"Variant {variant.id}: harness plugins/init/bare/runtime_state are not supported "
+            f"for agent 'codex' yet (F5)."
         )
     cmd = [
         "harbor", "run", "-p", str(task), "-a", AGENT_IMPORT_PATHS[variant.agent], "-m", model,
@@ -55,6 +56,8 @@ def _harbor_command(variant: Variant, task: Path, job_name: str, jobs_dir: Path,
             cmd += ["--ak", f"init_command={variant.init}"]
         if variant.bare:
             cmd += ["--ak", "bare=true"]
+        if variant.runtime_state:
+            cmd += ["--ak", "runtime_state=" + ",".join(variant.runtime_state)]
     for key, value in variant.env.items():
         cmd += ["--ae", f"{key}={value}"]
     if ENV_FILE.is_file():
@@ -144,8 +147,8 @@ def cmd_gate(args: argparse.Namespace) -> int:
         status = "PASS" if g.passed else "FAIL"
         cost = f"${g.cost_usd:.4f}" if g.cost_usd is not None else "-"
         reward = g.reward.get("reward") if g.reward else "-"
-        print(f"{status}  {g.variant:<18} {g.trial:<28} reward={reward} cost={cost} turns={g.num_turns} "
-              f"plugins={g.plugins} builtin_plugins={g.builtin_plugins} mcp={g.mcp_servers}")
+        print(f"{status}  [{g.category:<13}] {g.variant:<18} {g.trial:<28} reward={reward} cost={cost} "
+              f"turns={g.num_turns} plugins={g.plugins} builtin_plugins={g.builtin_plugins} mcp={g.mcp_servers}")
         for reason in g.reasons:
             print(f"      - {reason}")
     write_report(gates, jobs_dir / "owl-gate.json")
