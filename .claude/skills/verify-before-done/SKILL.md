@@ -6,7 +6,7 @@ metadata:
   maxWords: 650
 ---
 
-<!-- navori:managed id="verify-before-done-base" hash="8eced5f7" version="0.10.0" source="@navori/core" fmkeys="name,description,metadata" -->
+<!-- navori:managed id="verify-before-done-base" hash="6dfddffb" version="0.10.0" source="@navori/core" fmkeys="name,description,metadata" -->
 # Verify Before Done
 
 ## The Iron Law
@@ -25,7 +25,7 @@ BEFORE claiming "done / ready / approved": IDENTIFY the command that proves it â
 
 | Claim | Required output | Not sufficient |
 |---|---|---|
-| `ruff check .` / `ruff check .` green | Full command run this turn, exit 0 | "ran it before", "should be green" |
+| `ruff check .` / `ruff check . && uv run pytest -m 'not docker'` green | Full command run this turn, exit 0 | "ran it before", "should be green" |
 | Zero new errors vs baseline | `git diff --name-only main` â€” a failure outside that list predates you | "lint said OK", no comparison |
 | UI validated in the browser (only if asked) | Observed state via the repo's browser tool this turn | "looks fine in code" |
 | Bug fixed | Reproduce the original symptom and see it NOT happen | "code changed, assumed fixed" |

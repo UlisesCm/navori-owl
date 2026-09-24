@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** pausado — F1 cerrado (pendiente merge). Siguiente paso: F2 (suite v1: repo paciente + 12–15 tareas + corrida tramposa + holdout). Arrastrar a F2: registrar el SHA de baseline fuera de /app para detectar `git update-ref` del agente; gate con baseline_valid=0 → contaminación.
+**Estado:** en curso — F2 (specs/f2-suite-v1/tasks.md es el tablero). Lotes 0–1 listos (PR). Siguiente: lote 2 (T4 repo paciente opsdesk + seal.sh que centraliza owl_snapshot; T5 navori sobre el paciente).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
