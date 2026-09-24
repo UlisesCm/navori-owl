@@ -142,13 +142,22 @@ las reglas de navori.
   4. `update-ref refs/owl/baseline HEAD`.
   5. Escribe `/var/lib/owl/baseline` (el SHA), `/var/lib/owl/ignore` (copia del `.gitignore` raíz) y
      `/var/lib/owl/baseline.manifest` (snapshot de contenido, D6 punto 3). Los tres root, 0444.
-  6. `chown -R node:node /app`.
-  7. `reflog expire --expire=now --all` y `gc -q --prune=now`.
+  6. `reflog expire --expire=now --all` y `gc -q --prune=now`.
+  7. `chown -R node:node /app`.
+  - **Orden 6-7, no al revés (corregido en lote 4, encontrado por el ataque `move-baseline`):**
+    `reflog expire`/`gc` corren como root y reescriben `.git/logs/HEAD`, `.git/packed-refs` y
+    `.git/info/refs`. Si el `chown` corre antes, esos tres archivos quedan `root:root` tras el paso
+    7 pese al `chown -R` previo — y `node` ya no puede `git commit` (`fatal: cannot update the ref
+    'HEAD': unable to append to '.git/logs/HEAD': Permission denied`), lo que hace fallar en
+    silencio cualquier commit del agente post-sellado, incluido el ataque `move-baseline` (D8).
 - El commit se hace después del patch. Por eso la versión correcta del código (y los tests visibles
   que el seed borra) nunca entra a los objetos de git.
 - La imagen base tiene el paciente solo en `/app`, sin copias en otro lado.
 - `owl` construye `owl-patient:local` antes de invocar Harbor si falta o si su label
-  `owl.patient_hash` no coincide con el hash de contenido de `patient/`.
+  `owl.patient_hash` no coincide con el hash de contenido de `patient/` (`owl/patient.py`).
+  El hash cubre todo archivo bajo `patient/` excepto lo que `patient/.gitignore` ya declara
+  que un checkout real nunca trae: `node_modules/`, los dos scratch dirs bajo `data/` (salvo su
+  placeholder) y cualquier `.db` suelto en `data/` — no existe `.dockerignore` propio.
 - Por qué imagen base y no copias: 15 copias del paciente derivarían; Harbor usa `environment/` como
   build context, y un `COPY` no puede salir de ese directorio.
 - `FROM` de una imagen solo local bajo el `pull_policy: build` de
