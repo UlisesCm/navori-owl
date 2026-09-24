@@ -134,6 +134,12 @@ harness:
     # harness if a future navori release changes that behavior.
     test -d /app/.claude/agents || { echo "navori: .claude/agents missing after init+render" >&2; exit 1; }
     grep -q '"engram"' /app/.mcp.json || { echo "navori: engram missing from .mcp.json" >&2; exit 1; }
+    # T5 (D13, third check deferred from the spike): the patient's own base content
+    # (patient/CLAUDE.md, byte-identical in AGENTS.md per T4) must survive coexist
+    # init + render --apply, not just get appended around. Grep the stable marker
+    # line every patient revision carries right after the intro paragraph.
+    grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/CLAUDE.md || { echo "navori: base CLAUDE.md content missing after init+render" >&2; exit 1; }
+    grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/AGENTS.md || { echo "navori: base AGENTS.md content missing after init+render" >&2; exit 1; }
   runtime_state:
     - ".claude/.managed-drift-stamp"
     - ".claude/.routing-watch/"
