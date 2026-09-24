@@ -43,11 +43,49 @@ class ClaudeCodeHarnessOptions(ClaudeCodeOptions):
         description=(
             "Comma-separated .gitignore-style patterns for harness runtime state the "
             "variant's own tooling writes into /app *after* install (hook stamps, "
-            "session-scoped dirs, ...) — never part of the agent's work. Appended to "
-            "/app/.git/info/exclude so `git ls-files --others --exclude-standard` (what "
-            "tasks/*/tests/test.sh scores scope from) stops seeing them."
+            "session-scoped dirs, ...) — never part of the agent's work. Appended, as "
+            "root, to /var/lib/owl/ignore (D6.3) — the only file owl_changes "
+            "(owl/verifier/lib.sh) reads excludes from — so a real edit to one of "
+            "these paths still counts as out of scope: this list is agent-visible "
+            "the moment ClaudeCodeHarness writes it, so it must be root-owned, never "
+            "a path (.gitignore, .git/info/exclude) the agent could edit back out."
         ),
     )
+
+
+#: CANONICAL ALGORITHM — must stay byte-identical (as shell text) to
+#: `owl_snapshot()` in owl/verifier/lib.sh and to the seal step in
+#: tasks/*/environment/Dockerfile. Review finding cycle 1 (2026-09-24): owl_changes
+#: used to diff via `git diff --name-only`, which trusts the agent's own worktree/
+#: index stat cache — `git update-index --assume-unchanged`/`--skip-worktree` (plain
+#: plumbing, zero privilege) made a real tracked-file edit invisible to it. Content-
+#: only comparison (mode + sha256 per file, symlink target, typed FIFO/socket/device
+#: entries) has no such cache to fool. Review cycle 2: adds octal mode, non-regular/
+#: non-symlink entries, and fails closed (nonzero exit) on a filename containing a
+#: literal newline instead of corrupting the manifest — see owl_snapshot's docstring
+#: (owl/verifier/lib.sh) for the full rationale and why this is duplicated instead of
+#: shared (no base image both this and the Dockerfile can COPY from yet); byte-
+#: identity across all three copies is regression-tested by
+#: tests/test_validate_docker.py::test_three_snapshot_copies_are_byte_identical.
+_SNAPSHOT_CMD = (
+    "bash -c 'rm -f /var/lib/owl/baseline.manifest; T=0; "
+    'nl() { [ "$(printf "%s" "$1" | wc -l)" = 0 ]; }; '
+    ": > /var/lib/owl/baseline.manifest; "
+    'while IFS= read -r -d "" f; do nl "$f" || { T=1; continue; }; '
+    'm=$(stat -c "%a" "$f" 2>/dev/null) || continue; '
+    'h=$(sha256sum "$f" 2>/dev/null) || continue; h=${h%% *}; '
+    'printf "F\\t%s\\t%s\\t%s\\n" "$m" "$h" "$f" >> /var/lib/owl/baseline.manifest; '
+    "done < <(find /app -path /app/.git -prune -o -type f -print0 2>/dev/null); "
+    'while IFS= read -r -d "" f; do nl "$f" || { T=1; continue; }; '
+    't=$(readlink "$f" 2>/dev/null) || continue; nl "$t" || { T=1; continue; }; '
+    'printf "L\\t%s\\t%s\\n" "$t" "$f" >> /var/lib/owl/baseline.manifest; '
+    "done < <(find /app -path /app/.git -prune -o -type l -print0 2>/dev/null); "
+    'while IFS= read -r -d "" f; do nl "$f" || { T=1; continue; }; '
+    'ft=$(stat -c "%F" "$f" 2>/dev/null) || continue; '
+    'printf "O\\t%s\\t%s\\n" "$ft" "$f" >> /var/lib/owl/baseline.manifest; '
+    "done < <(find /app -path /app/.git -prune -o \\( -type p -o -type s -o -type c -o -type b \\) -print0 2>/dev/null); "
+    "LC_ALL=C sort -o /var/lib/owl/baseline.manifest /var/lib/owl/baseline.manifest; exit $T'"
+)
 
 
 class ClaudeCodeHarness(ClaudeCode):
@@ -121,16 +159,54 @@ class ClaudeCodeHarness(ClaudeCode):
                 env=self._resolve_auth_env(),
             )
 
-            patterns = self._runtime_state_patterns()
-            if patterns:
-                # Local exclude, not tracked content: never shows up in any diff or commit,
-                # unlike a .gitignore edit would. `git ls-files --others --exclude-standard`
-                # (tasks/*/tests/test.sh's scope check) honors .git/info/exclude natively.
-                quoted = " ".join(shlex.quote(p) for p in patterns)
-                await self.exec_as_agent(
+            # D5: reread the moved ref as the agent user (a shell it controls), but
+            # only ROOT may overwrite the root-owned 0444 record at
+            # /var/lib/owl/baseline — seal.sh (tasks/*/environment/Dockerfile)
+            # wrote it once at build time, at the fixture commit; this call is the
+            # only thing allowed to move it past that, and only to where the
+            # variant's own installer actually left refs/owl/baseline. Validate
+            # hex-40 before writing so a malformed or empty value can't corrupt the
+            # record — owl_baseline (owl/verifier/lib.sh) fails closed
+            # (baseline_valid=0) if this write never lands.
+            result = await self.exec_as_agent(
+                environment,
+                command="cd /app && git rev-parse refs/owl/baseline",
+                env=self._resolve_auth_env(),
+            )
+            new_sha = result.stdout.strip()
+            if len(new_sha) == 40 and all(c in "0123456789abcdef" for c in new_sha):
+                await self.exec_as_root(
                     environment,
-                    command=f"cd /app && printf '%s\\n' {quoted} >> .git/info/exclude",
-                    env=self._resolve_auth_env(),
+                    command=(
+                        f"printf '%s\\n' {shlex.quote(new_sha)} > /var/lib/owl/baseline "
+                        "&& chmod 0444 /var/lib/owl/baseline"
+                    ),
                 )
+                # Refresh the content snapshot owl_changes diffs against (D6, review
+                # 2026-09-24) to match the moved commit too — otherwise every file the
+                # installer wrote would still read as "changed" against the stale,
+                # build-time snapshot, and out-of-scope detection would be meaningless
+                # for every variant with harness.init (the exact bug the "variant
+                # installed" commit above already exists to avoid for the SHA record).
+                await self.exec_as_root(
+                    environment,
+                    command=f"{_SNAPSHOT_CMD} && chmod 0444 /var/lib/owl/baseline.manifest",
+                )
+
+        # D6.3: runtime_state patterns are appended to the root-owned
+        # /var/lib/owl/ignore record, as root — never to .git/info/exclude or any
+        # other path the agent controls, which owl_changes (owl/verifier/lib.sh)
+        # deliberately never reads from (an agent could otherwise edit its own
+        # exclude list to hide real work). This runs whether or not the variant
+        # declares harness.init: the two fields are independent on a Variant
+        # (owl/variants.py), so a variant could ship runtime_state without an
+        # install step.
+        patterns = self._runtime_state_patterns()
+        if patterns:
+            quoted = " ".join(shlex.quote(p) for p in patterns)
+            await self.exec_as_root(
+                environment,
+                command=f"printf '%s\\n' {quoted} >> /var/lib/owl/ignore",
+            )
 
         await super().run(instruction, environment, context)

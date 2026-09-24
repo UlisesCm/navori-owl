@@ -75,7 +75,10 @@
 # defaults that to `"off"`. Filed upstream as
 # https://github.com/UlisesCm/navori-harness/issues/1024 (init should exclude its
 # own EPHEMERAL_HARNESS_PATHS regardless of gitignoreHarness, or owl wouldn't need
-# this field at all).
+# this field at all). T1/T2 (2026-09-24): the mechanism this `runtime_state` field
+# feeds changed from `.git/info/exclude` (agent-writable — D6.3 closed that gap) to
+# the root-owned `/var/lib/owl/ignore` record; `harness.runtime_state` itself is
+# unchanged, still just a list of patterns.
 #
 # RULE (tightened 2026-09-24, reviewer finding on the first cut of this list):
 # runtime_state is ONLY for paths the harness itself writes by itself during the
@@ -122,6 +125,15 @@ harness:
     rm -rf -- "$ENGRAM_TMP"
     export PATH="$HOME/.local/bin:$PATH"
     npx --yes navori@0.10.0 init --yes --cwd /app
+    npx --yes navori@0.10.0 render --apply --cwd /app
+    # Spike T0 (D13): sentinel check, verified free in a node:22-bookworm-slim
+    # container against a fixture CLAUDE.md (specs/f2-suite-v1/spike.md, check 3)
+    # — coexist init + render --apply generates .claude/ and registers engram in
+    # .mcp.json without prompting and without touching the base CLAUDE.md content.
+    # Fails loud (exit 1) instead of silently running the trial without the
+    # harness if a future navori release changes that behavior.
+    test -d /app/.claude/agents || { echo "navori: .claude/agents missing after init+render" >&2; exit 1; }
+    grep -q '"engram"' /app/.mcp.json || { echo "navori: engram missing from .mcp.json" >&2; exit 1; }
   runtime_state:
     - ".claude/.managed-drift-stamp"
     - ".claude/.routing-watch/"
