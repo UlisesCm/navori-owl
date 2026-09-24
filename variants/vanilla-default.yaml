@@ -1,0 +1,9 @@
+# Baseline: Claude Code exactly as shipped. Nothing is added; the fixture has no .claude/.
+id: vanilla-default
+description: Claude Code sin harness, modo por defecto (auto-discovery activo).
+agent: claude-code
+agent_version: "2.1.281"
+harness: {}
+expect:
+  plugins: []
+  mcp_servers: []
