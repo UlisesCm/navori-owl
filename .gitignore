@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.env.*
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+
+# Resultados de corridas y sandboxes (pueden contener transcripts y costos)
+results/
+jobs/
+sandboxes/
+
+# Harness local (no versionar estado de sesión)
+.claude/worktrees/
+.claude/settings.local.json
