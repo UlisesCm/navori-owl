@@ -163,7 +163,11 @@ def check_trial(trial_dir: Path, variant: dict) -> TrialGate:
     gate = TrialGate(trial=trial_dir.name, variant=variant["id"], passed=True)
     reward_file = trial_dir / "verifier" / "reward.json"
     if reward_file.is_file():
-        gate.reward = json.loads(reward_file.read_text())
+        try:
+            gate.reward = json.loads(reward_file.read_text())
+        except json.JSONDecodeError:
+            gate.passed = False
+            gate.reasons.append("invalid reward.json")
 
     agent = variant.get("agent", "claude-code")
     check = _AGENT_CHECKS.get(agent)

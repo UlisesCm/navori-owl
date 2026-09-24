@@ -9,4 +9,4 @@ harness:
       ref: e3ba2aa6f1e6f0bc4d69eb09c9f0d0a93af56156   # 2026-09-14
 expect:
   plugins: [ponytail]
-  mcp_servers: []   # TODO(F0): confirm whether its ponytail-mcp registers by default
+  mcp_servers: []   # confirmed 2026-09-24 (CLI 2.1.281): plugins=['ponytail'], mcp_servers=[]
