@@ -256,6 +256,9 @@ Cada ficha incluye opciones, la recomendada, la evidencia y lo que se pierde. Se
 | **F4 — Reporte/dashboard** | Vistas de §11 generadas automáticamente; OTel por skill/herramienta si el desglose lo pide | Reproducible desde `results/` |
 | **F5 — Más allá de Claude Code** | Variantes con codex/opencode (adaptadores de Harbor) y agentes propios (`BaseAgent`) | Una ronda mixta |
 
+`codex-default` (baseline, sin harness) se adelantó de F5: ya corre por `owl run`/`owl gate` vía el agente
+`codex` nativo de Harbor. El harness/plugins de Codex sigue en F5.
+
 ## 14. Trampas a vigilar
 
 Lista completa en [02 §10](docs/research/02-metodologia.md). Las específicas de comparar harnesses:

@@ -54,6 +54,19 @@ agente puede leer, variantes que "ganan" solo porque gastaron más.
   - Corrección por comparaciones múltiples.
   - Errores de infraestructura separados de las derrotas.
 
+## Uso
+
+```
+owl run -v vanilla-default -v superpowers -t tasks/00-smoke -k 1
+owl run -v codex-default -t tasks/00-smoke -k 1
+owl gate jobs/
+```
+
+`--auth oauth` (default) usa tu suscripción activa (login de Claude Code o del plan de ChatGPT, según
+el agente de la variante); `--auth api-key` usa `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`. Una corrida no puede
+mezclar variantes de distinto agente sin pasar `-m` explícito, porque el modelo por defecto es de un
+proveedor a la vez.
+
 ## Primeras variantes
 
 El catálogo es abierto: cualquier agente o harness entra si se puede describir con un manifiesto. La primera
