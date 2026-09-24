@@ -17,6 +17,7 @@ from pathlib import Path
 
 from owl.gate import check_jobs, write_report
 from owl.tasks import resolve_task_args
+from owl.validate import cmd_validate
 from owl.variants import ROOT, Variant
 
 AGENT_IMPORT_PATHS = {
@@ -189,6 +190,27 @@ def main() -> None:
     gate.add_argument("jobs_dir", nargs="?", default="jobs")
     gate.set_defaults(func=cmd_gate)
 
+    validate = sub.add_parser(
+        "validate", help="Free checklist (oracle x5, nop, CheatAgent attacks): owl-validate.json, no model calls."
+    )
+    validate.add_argument("-t", "--task", action="append", help="Repeatable. Required unless --suite.")
+    validate.add_argument("--suite", action="store_true", help="Validate every suite task under tasks/.")
+    validate.add_argument(
+        "--holdout", action="store_true",
+        help="With --suite, also include holdout/. Required to validate any holdout task at all (R15). "
+             "Holdout output shows only pass/fail per check, never content (D10).",
+    )
+    validate.add_argument(
+        "--checks", default="static,oracle,nop,cheat",
+        help="Comma-separated subset of: static,oracle,nop,cheat.",
+    )
+    validate.add_argument(
+        "--attacks", default=None,
+        help="Comma-separated subset of CheatAgent attacks (default: all of D8).",
+    )
+    validate.add_argument("-n", "--n-concurrent", type=int, default=4)
+    validate.add_argument("--jobs-dir", default="jobs")
+    validate.set_defaults(func=cmd_validate)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
