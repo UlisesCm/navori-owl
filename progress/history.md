@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-24 11:20 orchestrator — F1: absorbe navori-evals (variante navori, runtime_state, baseline fijo)
+- Cambios: variants/navori.yaml (navori@0.10.0 + engram v2.1.0 fijado con sha256, runtime_state), owl/agents/claude_code_harness.py (commit "variant installed", refs/owl/baseline, .git/info/exclude), owl/gate.py (category ok/infra/contamination), owl/variants.py + owl/cli.py (runtime_state), tasks/00-smoke (baseline en Dockerfile, test.sh mide contra refs/owl/baseline), docs/research/06 §7, VISION §6/§13. navori-evals archivado con nota en su README.
+- Quality gate: ✅ ruff check . verde (reviewer Pass 2, APPROVED tras varias rondas).
+- Notas: corridas reales navori 00-smoke: $0.049 y $0.29 (delegó en implementer/reviewer y commiteó en branch). Esa corrida destapó que test.sh medía contra HEAD: cambios commiteados eran invisibles; corregido con baseline fijo y fail-closed. Riesgo residual documentado: un agente puede mover refs/owl/baseline con git update-ref (detectarlo requiere registrar el SHA fuera de /app → F2, junto con la corrida tramposa). Recomendado: gate marque baseline_valid=0 como contaminación. Issues upstream: navori-harness#1023 (init no avisa engram faltante) y #1024 (efímeros sin gitignore por defecto).
+- Commit / PR: branch feat/f1-absorb-navori-evals
+
 ## 2026-09-24 10:15 orchestrator — Cierre de F0: variantes con plugin, probe real y runners compilados
 - Cambios: tasks/01-probe/tests/test.sh (`home_claude_clean` por deny-list, fail-closed), owl/gate.py (reward.json inválido → FAIL sin crash), variants/ponytail.yaml (MCP confirmado), docs/research/07.
 - Quality gate: ✅ ruff check . verde (reviewer Pass 2, APPROVED tras una ronda de CHANGES_REQUESTED).
