@@ -38,6 +38,16 @@ class ClaudeCodeHarnessOptions(ClaudeCodeOptions):
         default=False,
         description="Pass --bare (skips all auto-discovery; requires ANTHROPIC_API_KEY).",
     )
+    runtime_state: str | None = Field(
+        default=None,
+        description=(
+            "Comma-separated .gitignore-style patterns for harness runtime state the "
+            "variant's own tooling writes into /app *after* install (hook stamps, "
+            "session-scoped dirs, ...) — never part of the agent's work. Appended to "
+            "/app/.git/info/exclude so `git ls-files --others --exclude-standard` (what "
+            "tasks/*/tests/test.sh scores scope from) stops seeing them."
+        ),
+    )
 
 
 class ClaudeCodeHarness(ClaudeCode):
@@ -56,6 +66,10 @@ class ClaudeCodeHarness(ClaudeCode):
 
     def _remote_plugin_dir(self, source: Path) -> PurePosixPath:
         return self._REMOTE_PLUGINS_DIR / source.name
+
+    def _runtime_state_patterns(self) -> list[str]:
+        raw = self.options.runtime_state or ""
+        return [p for p in raw.split(",") if p.strip()]
 
     def build_cli_flags(self) -> str:
         flags = [super().build_cli_flags()]
@@ -79,5 +93,44 @@ class ClaudeCodeHarness(ClaudeCode):
                 command=f"cd /app && {self.options.init_command}",
                 env=self._resolve_auth_env(),
             )
+            # Baseline the diff *after* the variant's harness is installed, not against
+            # the bare fixture: otherwise every file the installer writes (.claude/,
+            # CLAUDE.md, .mcp.json, ...) reads as an agent edit. Lesson from navori-evals
+            # (docs/research/06, §2): this commit is what makes out-of-scope detection
+            # in tasks/*/tests/test.sh meaningful.
+            await self.exec_as_agent(
+                environment,
+                command=(
+                    "cd /app && git add -A && "
+                    "git -c user.name=owl -c user.email=owl@localhost "
+                    'commit -q --allow-empty -m "variant installed"'
+                ),
+                env=self._resolve_auth_env(),
+            )
+
+            # Advance the scope baseline to this commit. tasks/*/environment/Dockerfile already
+            # points refs/owl/baseline at the fixture commit (covers oracle/nop/codex and no-init
+            # variants); for variants with harness.init, this moves it past whatever the installer
+            # wrote, same reason as the commit above. tasks/*/tests/test.sh diffs against this ref,
+            # never HEAD — HEAD moves if the agent commits (real trial
+            # jobs/20260924-163415__00-smoke__navori__r1 committed on its own branch and the old
+            # HEAD-only diff made that invisible to scope/tests_touched).
+            await self.exec_as_agent(
+                environment,
+                command="cd /app && git update-ref refs/owl/baseline HEAD",
+                env=self._resolve_auth_env(),
+            )
+
+            patterns = self._runtime_state_patterns()
+            if patterns:
+                # Local exclude, not tracked content: never shows up in any diff or commit,
+                # unlike a .gitignore edit would. `git ls-files --others --exclude-standard`
+                # (tasks/*/tests/test.sh's scope check) honors .git/info/exclude natively.
+                quoted = " ".join(shlex.quote(p) for p in patterns)
+                await self.exec_as_agent(
+                    environment,
+                    command=f"cd /app && printf '%s\\n' {quoted} >> .git/info/exclude",
+                    env=self._resolve_auth_env(),
+                )
 
         await super().run(instruction, environment, context)

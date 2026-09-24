@@ -1,0 +1,132 @@
+# navori-harness installed by its own installer, pinned to a fixed npm version.
+#
+# Flags: `init --yes` (no `--recommended`, no `--full`). Confirmed locally 2026-09-24
+# (`npx --yes navori@0.10.0 init --yes --cwd <scratch copy of tasks/00-smoke/environment/app>`)
+# that `--yes` alone already writes the full harness (8 agents, ~14 skills, hooks,
+# .claude/settings.json) and CLAUDE.md — `--recommended`/`--full` only add EXTERNAL
+# tools (gh, tgrep, codegraph, semgrep, jscpd, acli) this task doesn't need and the
+# image doesn't have. `--yes` is therefore the minimal, coherent footprint.
+#
+# detectProject: package.json#name is used when present (00-smoke's fixture has
+# `"name": "cart"`), but it is NOT required — confirmed against an empty git repo
+# with no package.json (relevant for 01-probe, which has none): navori falls back
+# to the directory name and still renders successfully, only warning that no
+# quality gate was detected. So both 00-smoke and 01-probe are safe to run this
+# variant against.
+#
+# Hooks call `navori`, `gh`, `acli`, `semgrep`, `jscpd` (grepped from the rendered
+# .claude/hooks/*.sh), but every call is guarded with `command -v <bin> || ...`
+# first — confirmed by reading the guards, not just grepping the bin names. Same
+# for `jq`: every hook falls back to `node` (present in node:22-bookworm-slim) when
+# `jq` is missing. None of these are a blocker for this image.
+#
+# ENGRAM (resolved 2026-09-24, user decision): `navori init` registers the `engram`
+# MCP server in .mcp.json UNCONDITIONALLY (no flag to opt out — "Incluidos siempre
+# con navori: engram"), because a real user of navori always gets it, so the variant
+# must install the same binary the CLI's own plugin manifest points at rather than
+# treat it as an opt-in dependency. The real reason owl has to install it itself:
+# (1) `navori init` never runs the plugin's `externalTool.install` for always-on
+# plugins — it only *warns* about missing binaries under `--full`, and even then
+# never installs (confirmed reading `navori-harness/packages/cli/src/commands/
+# init.ts:372`, not assumed). Correction to an earlier note here: navori@0.10.0's
+# own published Linux install script (`npm pack navori@0.10.0` ->
+# dist/assets/plugins/engram/plugin.json, `externalTool.install.linux`) DOES work
+# today — it resolves the asset via `releases/latest` on the GitHub API and
+# verifies checksums.txt (confirmed: it resolved engram_2.1.0_linux_arm64.tar.gz).
+# The `raw.githubusercontent.com/.../scripts/install.sh` URL that 404s is NOT what
+# navori 0.10.0 uses; that was a stale plugin.json (v0.0.2) from a cached npx
+# resolution, not the published package. `init` below intentionally does NOT
+# delegate to navori's script anyway: (2) it pins `v2.1.0` instead of
+# `releases/latest`, for reproducibility — a trial's harness shouldn't silently
+# change because upstream cut a new release mid-run. ENGRAM_VERSION is the single
+# place to bump it. Upstream follow-up so `init` installs always-on externalTools
+# itself: https://github.com/UlisesCm/navori-harness/issues/1023. Verified end-to-end for free
+# in a node:22-bookworm-slim container (git/ca-certificates/curl/procps, matching
+# tasks/00-smoke/environment/Dockerfile, root user matching the image's lack of a
+# USER directive): checksum-verified tarball extraction, `engram --version` ->
+# "engram 2.1.0", `engram mcp --help` exit 0, and `engram mcp
+# --tools=mem_search` (navori's exact .mcp.json command+args) starting and exiting
+# cleanly on stdin EOF. `$HOME/.local/bin` was chosen over e.g. /usr/local/bin
+# because Harbor's own claude_code.py prepends exactly that directory to PATH
+# before invoking `claude` (see `_INSTALL_CHECK_COMMAND`/`_INSTALL_VERSION_COMMAND`
+# in harbor/agents/installed/claude_code.py), so it's guaranteed on PATH without
+# root and without touching a system directory.
+#
+# Auto-enable of project .mcp.json servers under `claude -p` (checked so this
+# doesn't become a second silent gap): confirmed via docs.claude.com/en/docs/
+# claude-code/mcp (2026-09-24) — "In claude -p runs, Agent SDK sessions, and cloud
+# sessions, Claude Code can't show that [approval] prompt: it loads project-scoped
+# servers without asking." So `enableAllProjectMcpServers`/`enabledMcpjsonServers`
+# (neither of which navori's generated .claude/settings.json sets) are NOT needed
+# for headless `claude -p` runs — Harbor always runs claude-code in `-p` mode. No
+# gap here.
+#
+# RUNTIME_STATE (added 2026-09-24, real run jobs/20260924-162201__00-smoke__navori__r1
+# hit this: reward=1, gate ok, but scope=0 — the verifier's changed-files had
+# `.claude/.managed-drift-stamp` and `.claude/.routing-watch/<session_id>` alongside
+# the agent's real src/cart.js edit). These are navori's own hooks writing
+# machine-local state DURING the run, not agent work — but they're untracked and
+# postdate the "variant installed" baseline commit, so a plain
+# `git ls-files --others --exclude-standard` scope check can't tell them apart from
+# an agent edit. Upstream: navori's own EPHEMERAL_HARNESS_PATHS (single source of
+# truth, `navori-harness/packages/cli/src/engines/shared/ephemeral-paths.ts`)
+# already lists exactly these paths as "never committed" — but `init` only wires
+# them into the repo's `.gitignore` when `gitignoreHarness != "off"`, and `--yes`
+# defaults that to `"off"`. Filed upstream as
+# https://github.com/UlisesCm/navori-harness/issues/1024 (init should exclude its
+# own EPHEMERAL_HARNESS_PATHS regardless of gitignoreHarness, or owl wouldn't need
+# this field at all).
+#
+# RULE (tightened 2026-09-24, reviewer finding on the first cut of this list):
+# runtime_state is ONLY for paths the harness itself writes by itself during the
+# run — never config that changes agent behavior, even if navori's own
+# EPHEMERAL_HARNESS_PATHS also lists it as "never committed" for an unrelated
+# reason (backup/gitignore hygiene, not scope safety). Excluding a behavior file
+# from scope would let an agent edit it — e.g. grant itself permissions, change
+# the model — and have that edit invisible to the scope metric, which defeats the
+# whole point of measuring scope. So `.claude/settings.local.json` is deliberately
+# NOT in this list even though EPHEMERAL_HARNESS_PATHS has it: navori's hooks never
+# write it at runtime (it's hand-edited, per-user config, not harness-generated
+# operational state), so if it changes during a trial, an agent wrote it, and that
+# must count as out of scope like any other edit. The remaining 4 entries pass the
+# rule: `.claude/.managed-drift-stamp` and `.claude/.routing-watch/` are pure hook
+# timing/session marks (confirmed reading the hooks — timestamps and per-session
+# counters, nothing that changes agent permissions or config); `.claude/progress/`
+# and `.claude/worktrees/` are operational byproducts the harness's own
+# orchestrator/subagent-handoff and parallel-worktree machinery create and manage
+# as part of running a session, not user-authored config an agent could turn into
+# a privilege-escalation vector. `.codex/progress/` is omitted regardless: this
+# variant never renders the Codex engine.
+id: navori
+description: navori-harness instalado por su propio installer (npx), pineado a 0.10.0, con engram instalado desde su release pineado.
+agent: claude-code
+agent_version: "2.1.281"
+harness:
+  init: |
+    set -eu
+    ENGRAM_VERSION="2.1.0"
+    case "$(uname -m)" in
+      x86_64) ENGRAM_ARCH=amd64 ;;
+      aarch64|arm64) ENGRAM_ARCH=arm64 ;;
+      *) echo "engram: unsupported arch $(uname -m)" >&2; exit 1 ;;
+    esac
+    ENGRAM_TARBALL="engram_${ENGRAM_VERSION}_linux_${ENGRAM_ARCH}.tar.gz"
+    ENGRAM_BASE_URL="https://github.com/Gentleman-Programming/engram/releases/download/v${ENGRAM_VERSION}"
+    ENGRAM_TMP="$(mktemp -d)"
+    curl -fsSL -o "$ENGRAM_TMP/$ENGRAM_TARBALL" "$ENGRAM_BASE_URL/$ENGRAM_TARBALL"
+    curl -fsSL -o "$ENGRAM_TMP/checksums.txt" "$ENGRAM_BASE_URL/checksums.txt"
+    (cd "$ENGRAM_TMP" && grep " $ENGRAM_TARBALL\$" checksums.txt | sha256sum -c -)
+    mkdir -p "$HOME/.local/bin"
+    tar -xzf "$ENGRAM_TMP/$ENGRAM_TARBALL" -C "$HOME/.local/bin" engram
+    chmod +x "$HOME/.local/bin/engram"
+    rm -rf -- "$ENGRAM_TMP"
+    export PATH="$HOME/.local/bin:$PATH"
+    npx --yes navori@0.10.0 init --yes --cwd /app
+  runtime_state:
+    - ".claude/.managed-drift-stamp"
+    - ".claude/.routing-watch/"
+    - ".claude/worktrees/"
+    - ".claude/progress/"
+expect:
+  plugins: []
+  mcp_servers: [engram]

@@ -34,6 +34,7 @@ class Variant:
     plugins: list[Plugin] = field(default_factory=list)
     init: str | None = None
     bare: bool = False
+    runtime_state: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
     expect: dict[str, list[str]] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)
@@ -61,6 +62,7 @@ class Variant:
             plugins=plugins,
             init=harness.get("init"),
             bare=bool(harness.get("bare", False)),
+            runtime_state=[str(p) for p in (harness.get("runtime_state") or [])],
             env={k: str(v) for k, v in (harness.get("env") or {}).items()},
             expect={k: list(v or []) for k, v in (data.get("expect") or {}).items()},
             raw=data,

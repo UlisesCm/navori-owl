@@ -137,6 +137,29 @@ Otros ejemplos, abreviados:
 - `gentle-ai`: `init: "gentle-ai install --agent claude-code --preset full-gentleman --scope workspace"` con el binario fijado por `go install …@vX.Y.Z`.
 - Agente propio: `agent: custom:mi_agente:MiAgente` (una clase `BaseAgent` o `BaseInstalledAgent` de Harbor).
 
+`harness.runtime_state` (lista de patrones estilo `.gitignore`, opcional): estado que el propio
+harness de la variante escribe en `/app` **durante** la corrida (stamps de hooks, directorios por
+sesión, ...) — nunca trabajo del agente. `ClaudeCodeHarness.run` los agrega a
+`/app/.git/info/exclude` justo después del commit "variant installed", así
+`git ls-files --others --exclude-standard` (de donde `tasks/*/tests/test.sh` mide el scope) deja
+de verlos como ediciones del agente, sin tocar ningún archivo versionado. Ejemplo real,
+`variants/navori.yaml`: `.claude/.managed-drift-stamp`, `.claude/.routing-watch/`, y el resto de
+`EPHEMERAL_HARNESS_PATHS` de navori-harness — lección de un trial real
+(`jobs/20260924-162201__00-smoke__navori__r1`) donde esos archivos bajaron el `scope` a 0 sin que
+el agente hubiera tocado nada fuera de lo pedido.
+
+**Regla:** `runtime_state` es solo para archivos que el harness escribe **por sí mismo durante la
+corrida** — nunca config que cambia el comportamiento del agente (permisos, modelo, etc.), aunque
+esa config también aparezca en la lista de "nunca versionado" del harness por otro motivo
+(higiene de backup/`.gitignore`, no seguridad de scope). Excluir un archivo de config del scope le
+dejaría a un agente editarlo — auto-otorgarse permisos, cambiar el modelo — sin que esa edición
+cuente como fuera de scope, lo que anula el propósito de medir scope. Por eso
+`.claude/settings.local.json` (que sí está en `EPHEMERAL_HARNESS_PATHS` de navori) se dejó
+deliberadamente fuera de `variants/navori.yaml#harness.runtime_state`: los hooks de navori nunca
+lo escriben en runtime (es config de usuario editada a mano, no estado operativo generado por el
+harness), así que si cambia durante un trial fue el agente, y debe contar como fuera de scope como
+cualquier otra edición.
+
 Las instalaciones exactas de cada candidato están en [04 §2](docs/research/04-catalogo-harnesses.md).
 
 ## 7. Aislamiento
@@ -250,7 +273,7 @@ Cada ficha incluye opciones, la recomendada, la evidencia y lo que se pierde. Se
 | Fase | Entregable | Criterio de salida |
 |---|---|---|
 | **F0 — Spike Harbor** | Tarea smoke en formato Harbor; `vanilla-default`, `vanilla-bare` y una variante plugin vía la subclase | Gate de contaminación funcionando; costo y tokens por variante; confirmado que los tests no son visibles al agente |
-| **F1 — Absorber navori-evals** | Migrar `00-smoke` y los aprendizajes ([06](docs/research/06-antecedentes-navori-evals.md)); archivar navori-evals | Nada útil queda solo en el prototipo |
+| **F1 — Absorber navori-evals** | Migrar `00-smoke` y los aprendizajes ([06](docs/research/06-antecedentes-navori-evals.md)); archivar navori-evals | Nada útil queda solo en el prototipo — estado 2026-09-24: `variants/navori.yaml`, commit "variant installed" y bucket `infra`/`contamination` migrados ([06 §7](docs/research/06-antecedentes-navori-evals.md#7-estado-de-la-absorción-f1-2026-09-24)); solo queda archivar el prototipo |
 | **F2 — Suite v1** | Paciente + 12–15 tareas + oráculos + corrida tramposa + holdout | Checklist por tarea en verde; piloto calibrado |
 | **F3 — Ronda 1** | `RULES.md` pre-registrado; 5–6 variantes (vanilla ×2, navori, gentle-ai, superpowers, ponytail, placebo) | Reporte completo y transcripts de las fallas revisados |
 | **F4 — Reporte/dashboard** | Vistas de §11 generadas automáticamente; OTel por skill/herramienta si el desglose lo pide | Reproducible desde `results/` |

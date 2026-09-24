@@ -26,12 +26,26 @@ class TrialGate:
     variant: str
     passed: bool
     reasons: list[str] = field(default_factory=list)
+    # "ok" (passed), "infra" (the agent/model was never reliably reached: no result event,
+    # auth/API error, harbor exit without a trial, invalid reward.json), or "contamination"
+    # (the trial ran but loaded something other than what the variant declared: expect
+    # mismatch, an MCP not connected, plugin/mcp errors, /solution visible). If a trial hits
+    # both, contamination wins: an infra hiccup doesn't excuse a contaminated run.
+    category: str = "ok"
     plugins: list[str] = field(default_factory=list)
     builtin_plugins: list[str] = field(default_factory=list)
     mcp_servers: list[str] = field(default_factory=list)
     cost_usd: float | None = None
     num_turns: int | None = None
     reward: dict | None = None
+
+
+def _fail(gate: TrialGate, reason: str, category: str) -> None:
+    """Record a failure reason under a bucket; contamination is sticky (never downgraded)."""
+    gate.passed = False
+    gate.reasons.append(reason)
+    if gate.category != "contamination":
+        gate.category = category
 
 
 def _events(log: Path) -> list[dict]:
@@ -49,8 +63,7 @@ def _events(log: Path) -> list[dict]:
 def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict) -> None:
     log = trial_dir / "agent" / "claude-code.txt"
     if not log.is_file():
-        gate.passed = False
-        gate.reasons.append("no claude-code.txt: agent never started")
+        _fail(gate, "no claude-code.txt: agent never started", "infra")
         return
 
     events = _events(log)
@@ -58,8 +71,7 @@ def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict) -> None:
     result = next((e for e in reversed(events) if e.get("type") == "result"), None)
 
     if init is None:
-        gate.passed = False
-        gate.reasons.append("no system/init event")
+        _fail(gate, "no system/init event", "infra")
     else:
         all_plugins = init.get("plugins") or []
         # Plugins Claude Code ships internally (e.g. "agents-md") aren't harness contamination:
@@ -74,66 +86,58 @@ def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict) -> None:
         for key, actual in (("plugins", gate.plugins), ("mcp_servers", gate.mcp_servers)):
             wanted = sorted(expect.get(key) or [])
             if actual != wanted:
-                gate.passed = False
-                gate.reasons.append(f"{key}: expected {wanted}, loaded {actual}")
+                _fail(gate, f"{key}: expected {wanted}, loaded {actual}", "contamination")
         for server in mcp_servers:
             status = server.get("status")
             if status != "connected":
-                gate.passed = False
-                gate.reasons.append(f"mcp server {server.get('name', '?')}: status {status}")
+                _fail(gate, f"mcp server {server.get('name', '?')}: status {status}", "contamination")
         for key in ("plugin_errors", "mcp_server_errors"):
             if init.get(key):
-                gate.passed = False
-                gate.reasons.append(f"{key}: {init[key]}")
+                _fail(gate, f"{key}: {init[key]}", "contamination")
 
     if result is None:
-        gate.passed = False
-        gate.reasons.append("no result event: run did not finish")
+        _fail(gate, "no result event: run did not finish", "infra")
     else:
         gate.cost_usd = result.get("total_cost_usd")
         gate.num_turns = result.get("num_turns")
         usage = result.get("usage") or {}
         tokens = sum(v for v in usage.values() if isinstance(v, (int, float)))
         if result.get("is_error"):
-            gate.passed = False
-            gate.reasons.append(f"result is_error: {str(result.get('result'))[:160]}")
+            # is_error covers both transport/auth failures (401, rate limits, ...) and the
+            # model genuinely erroring out mid-run; neither means the run loaded the wrong
+            # harness, so it's infra, not contamination.
+            _fail(gate, f"result is_error: {str(result.get('result'))[:160]}", "infra")
         if not tokens:
-            gate.passed = False
-            gate.reasons.append("zero tokens used: never reached the model")
+            _fail(gate, "zero tokens used: never reached the model", "infra")
 
 
 def _check_codex(gate: TrialGate, trial_dir: Path, variant: dict) -> None:
     log = trial_dir / "agent" / "codex.txt"
     if not log.is_file():
-        gate.passed = False
-        gate.reasons.append("no codex.txt: agent never started")
+        _fail(gate, "no codex.txt: agent never started", "infra")
         return
 
     expect = variant.get("expect") or {}
     if expect.get("plugins") or expect.get("mcp_servers"):
-        gate.passed = False
-        gate.reasons.append("plugins/mcp_servers expectation not verifiable for agent 'codex' (no harness yet)")
+        _fail(gate, "plugins/mcp_servers expectation not verifiable for agent 'codex' (no harness yet)", "contamination")
 
     events = _events(log)
     errors = [e for e in events if e.get("type") in ("error", "turn.failed")]
     if errors:
-        gate.passed = False
         for error in errors:
             detail = error.get("error") or error.get("message") or error
-            gate.reasons.append(f"{error.get('type')}: {str(detail)[:160]}")
+            _fail(gate, f"{error.get('type')}: {str(detail)[:160]}", "infra")
 
     completed = [e for e in events if e.get("type") == "turn.completed"]
     if not completed:
-        gate.passed = False
-        gate.reasons.append("no turn.completed event: run did not finish")
+        _fail(gate, "no turn.completed event: run did not finish", "infra")
         return
 
     gate.num_turns = len(completed)
     usage = completed[-1].get("usage") or {}
     tokens = sum(v for v in usage.values() if isinstance(v, (int, float)))
     if not tokens:
-        gate.passed = False
-        gate.reasons.append("zero tokens used: never reached the model")
+        _fail(gate, "zero tokens used: never reached the model", "infra")
 
 
 _AGENT_CHECKS = {
@@ -166,22 +170,19 @@ def check_trial(trial_dir: Path, variant: dict) -> TrialGate:
         try:
             gate.reward = json.loads(reward_file.read_text())
         except json.JSONDecodeError:
-            gate.passed = False
-            gate.reasons.append("invalid reward.json")
+            _fail(gate, "invalid reward.json", "infra")
 
     agent = variant.get("agent", "claude-code")
     check = _AGENT_CHECKS.get(agent)
     if check is None:
-        gate.passed = False
-        gate.reasons.append(f"gate: agent '{agent}' not supported")
+        _fail(gate, f"gate: agent '{agent}' not supported", "infra")
     else:
         check(gate, trial_dir, variant)
 
     _overlay_cost_from_result_json(gate, trial_dir)
 
     if gate.reward and gate.reward.get("solution_hidden") == 0:
-        gate.passed = False
-        gate.reasons.append("agent could see /solution")
+        _fail(gate, "agent could see /solution", "contamination")
 
     return gate
 
@@ -199,6 +200,7 @@ def check_jobs(jobs_dir: Path) -> list[TrialGate]:
                     variant=variant["id"],
                     passed=False,
                     reasons=[f"no trial: harbor exited with {code}"],
+                    category="infra",
                 )
             )
             continue

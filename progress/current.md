@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** pausado — F0 cerrado. Siguiente paso: F1 (absorber navori-evals, VISION §13), con presupuesto mínimo de tokens.
+**Estado:** pausado — F1 cerrado (pendiente merge). Siguiente paso: F2 (suite v1: repo paciente + 12–15 tareas + corrida tramposa + holdout). Arrastrar a F2: registrar el SHA de baseline fuera de /app para detectar `git update-ref` del agente; gate con baseline_valid=0 → contaminación.
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
