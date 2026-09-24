@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-24 15:30 orchestrator — F2 lote 3: holdout guard, CheatAgent y owl validate
+- Cambios: owl/tasks.py (holdout guard, suite_tasks), owl/validate.py + `owl validate` (checks estáticos, oracle ×5, nop, 6 ataques; sin modelo), owl/agents/cheat.py (read-hidden, tamper-fail, tamper-pass, hardcode, move-baseline, plant-reward), owl run --suite/--holdout, tests (test_tasks, test_validate, test_cheat, test_suite_catalog con skip explícito hasta 12 tareas, docker end to end), canary en 00-smoke/solution, D8 corregido.
+- Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (65 passed, 1 skipped; reviewer APPROVED). owl validate 00-smoke end to end verde (~141 s, sin modelo).
+- Notas: bajo move-baseline solo f2p queda en 1 (p2p falla cerrado por el mismo gate). `owl validate --suite` no revisa el conteo 12–15 ni la cobertura de categorías (lo hace tests/test_suite_catalog.py).
+- Commit / PR: branch feat/f2-lote3-validate
+
 ## 2026-09-24 14:40 orchestrator — F2 lote 2: repo paciente opsdesk y navori sobre el paciente
 - Cambios: patient/ (opsdesk: workspaces core/db/api/cli/legacy-sdk sobre node:sqlite, 23 tests visibles, CLAUDE.md + AGENTS.md idénticos, Dockerfile owl-patient:local por digest, seal.sh), variants/navori.yaml (init --yes + render --apply + centinelas), tests (test_patient_docs.py, test_patient_sealed, test_navori_install_on_patient), specs D2/D3/D13.
 - Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (reviewer Pass 2, APPROVED en ciclo 2; 17 docker verdes).

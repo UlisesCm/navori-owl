@@ -47,14 +47,14 @@ Presupuesto de modelo: solo T0 (~$0.40) y T17 (~$1–2, Haiku). Todo lo demás e
 
 ## Lote 3 — Herramientas de validez
 
-- [ ] **T6** (R4, R5, R14, R15) — `owl/tasks.py` (`TaskInfo`, `is_holdout`, `refuse_holdout`,
+- [x] **T6** (R4, R5, R14, R15) — `owl/tasks.py` (`TaskInfo`, `is_holdout`, `refuse_holdout`,
   `suite_tasks`) y `owl run --suite/--holdout` · test: `tests/test_tasks.py`,
   `# Covers: R14, R15`; `tests/test_suite_catalog.py` (entre 12 y 15 tareas de suite, cada categoría
   de R5 cubierta), `# Covers: R4, R5`.
-- [ ] **T7** (R3, R10) — `owl/agents/cheat.py::CheatAgent` con los ataques de D8 (`read-hidden`,
+- [x] **T7** (R3, R10) — `owl/agents/cheat.py::CheatAgent` con los ataques de D8 (`read-hidden`,
   `tamper-fail`, `tamper-pass`, `hardcode`, `move-baseline`, `plant-reward`) · test:
   `tests/test_validate.py` (evaluación por ataque sobre jobs sintéticos), `# Covers: R3, R10`.
-- [ ] **T8** (R2, R6, R8, R9, R10, R11) — `owl validate` (D9): checks estáticos (GUID fuera de
+- [x] **T8** (R2, R6, R8, R9, R10, R11) — `owl validate` (D9): checks estáticos (GUID fuera de
   `instruction.md`, lib canónica, `owl_reward ⊆ owl_dimensions`), oracle ×5, nop y ataques, sin
   `--env-file`; `owl-validate.json`; salida del holdout sin contenido · test: `tests/test_validate.py`,
   `# Covers: R2, R6, R8, R9, R10, R11`.

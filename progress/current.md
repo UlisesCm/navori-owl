@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 (specs/f2-suite-v1/tasks.md es el tablero). Lotes 0–2 listos. Siguiente: lote 3 (T6 guard de holdout y catálogo, T7 CheatAgent, T8 owl validate).
+**Estado:** en curso — F2 (specs/f2-suite-v1/tasks.md es el tablero). Lotes 0–3 listos. Siguiente: lotes 4–7 (T9–T12, las 12 tareas dev). Pendiente decisión del usuario: tarea 13 con canary inofensivo en su seed.patch.
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
