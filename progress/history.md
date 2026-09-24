@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-24 12:45 orchestrator — F2 lotes 0–1: spec, spike e integridad del verifier
+- Cambios: specs/f2-suite-v1/ (requirements R1–R17, design D1–D15, tasks T0–T17, spike.md); owl/verifier/lib.sh (nuevo: compara contenido contra manifiesto root-owned, git endurecido solo para baseline_valid, limpia /logs/verifier y mata procesos del agente); tasks/00-smoke migrada (agente no-root, /var/lib/owl/{baseline,baseline.manifest,ignore}); ClaudeCodeHarness refresca registro y manifiesto como root; owl/gate.py (baseline_valid=0 → contamination, verifier_complete=0 → infra); pytest en el quality gate; tests/ (5 unit + 15 docker opt-in); render de navori con el gate nuevo.
+- Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (reviewer Pass 2, APPROVED en el ciclo 3).
+- Notas: el review encontró un CRÍTICO reproducido (git update-index --assume-unchanged ocultaba ediciones al verifier); cerrado dejando de usar el .git del agente para decidir qué cambió. Spike: $0.27 (2 trials Haiku); navori init --yes + render --apply funciona sobre un CLAUDE.md base (sin fallback). Decisiones del usuario: F3 y piloto en Haiku, holdout por subagente aislado, 15 tareas.
+- Commit / PR: branch feat/f2-suite-v1
+
 ## 2026-09-24 11:20 orchestrator — F1: absorbe navori-evals (variante navori, runtime_state, baseline fijo)
 - Cambios: variants/navori.yaml (navori@0.10.0 + engram v2.1.0 fijado con sha256, runtime_state), owl/agents/claude_code_harness.py (commit "variant installed", refs/owl/baseline, .git/info/exclude), owl/gate.py (category ok/infra/contamination), owl/variants.py + owl/cli.py (runtime_state), tasks/00-smoke (baseline en Dockerfile, test.sh mide contra refs/owl/baseline), docs/research/06 §7, VISION §6/§13. navori-evals archivado con nota en su README.
 - Quality gate: ✅ ruff check . verde (reviewer Pass 2, APPROVED tras varias rondas).
