@@ -14,3 +14,6 @@ sandboxes/
 # Harness local (no versionar estado de sesión)
 .claude/worktrees/
 .claude/settings.local.json
+
+# navori-owl local cache (cloned harness sources)
+.owl-cache/

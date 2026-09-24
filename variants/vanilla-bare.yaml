@@ -1,0 +1,11 @@
+# Control baseline: --bare skips hooks, skills, plugins, MCP, auto memory and CLAUDE.md.
+# Requires ANTHROPIC_API_KEY (bare mode never reads CLAUDE_CODE_OAUTH_TOKEN).
+id: vanilla-bare
+description: Claude Code sin harness, modo --bare (nada auto-descubierto).
+agent: claude-code
+agent_version: "2.1.281"
+harness:
+  bare: true
+expect:
+  plugins: []
+  mcp_servers: []
