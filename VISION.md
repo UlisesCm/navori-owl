@@ -88,7 +88,7 @@ Ronda (pre-registrada: RULES.md)
  RULES.md  ───▶ │  3. Lanza Harbor ──────────────────────────────────────────┼──▶ Harbor
                 │                                                            │    ├ sandbox (docker/daytona/…)
                 │  4. Gate de contaminación (system/init + ¿llegó al modelo?)│◀── ├ agente (claude-code/codex/custom)
-                │  5. Recolecta: reward.json, stream-json, OTel, diff        │    └ tests ocultos → reward.json
+                │  5. Recolecta: reward.json, stream-json, ATIF, diff        │    └ tests ocultos → reward.json
                 │  6. Análisis: pareado por tarea, Holm, bootstrap, Pareto   │
                 │  7. Reporte: heatmap, Pareto, matriz pareada, costos       │
                 └────────────────────────────────────────────────────────────┘
@@ -106,7 +106,7 @@ Ronda (pre-registrada: RULES.md)
 **Qué pone owl:**
 1. **Manifiesto de variante** (§6), que se traduce a una subclase del adaptador de Harbor. Para Claude Code es `ClaudeCodeHarness(ClaudeCode)`, que añade `--plugin-dir`, un comando de init por variante, `--mcp-config` explícito y `--bare` opcional, porque el adaptador actual no soporta plugins.
 2. **Gate de contaminación.** Se lee `system/init` (`plugins`, `plugin_errors`, `mcp_servers`, `mcp_server_errors`) y se compara contra lo que declara el manifiesto. Si hubo algo de más o de menos, el trial se invalida. También se exige al menos una llamada exitosa al modelo: en Qihoo harness-bench #10, un HOME sin credenciales **puntuaba 0.0 en silencio**.
-3. **Telemetría por variante:** `OTEL_RESOURCE_ATTRIBUTES=arm=<id>,task=<id>,trial=<n>`. El costo se atribuye por variante, porque OTel reporta los plugins de terceros solo como `"third-party"`.
+3. **Telemetría por variante:** cada job de Harbor corre una sola variante, y Harbor ya extrae costo y tokens por trial (evento `result` de stream-json + trayectoria ATIF por paso). Eso basta para atribuir el costo por variante. OTel (`OTEL_RESOURCE_ATTRIBUTES=arm=<id>,task=<id>,trial=<n>`) queda para F4, solo si hace falta desglosar por skill o herramienta: OTel reporta los plugins de terceros como `"third-party"`.
 4. **Planificador intercalado:** las variantes se alternan para que la caché de prompts y el drift de la API no se confundan con un efecto (intent-as-a-service/harness-bench).
 5. **Análisis y reporte** (§9, §11).
 
@@ -161,7 +161,7 @@ Cada trial produce un `reward.json` con varias dimensiones. **Solo una es primar
 |---|---|---|---|---|
 | **Resultado** (decide) | Éxito | F2P ocultos + P2P (suite existente, typecheck, lint) | Determinista | SWE-bench, Terminal-Bench |
 | | Consistencia | pass^k por tarea | Derivado | τ-bench, Anthropic |
-| **Eficiencia** | Costo | USD, tokens in/out/cache (stream-json + OTel) | Métrica | HAL, Scaffold Effect |
+| **Eficiencia** | Costo | USD, tokens in/out/cache (stream-json + trayectoria ATIF) | Métrica | HAL, Scaffold Effect |
 | | Tiempo y esfuerzo | Wall-clock, turnos, tool calls, subagentes | Métrica | Harness-Bench |
 | | Costo por éxito | USD / tarea resuelta | Derivado | AI Agents That Matter |
 | **Comportamiento** (donde un harness suele diferenciarse) | Alcance | `git diff --name-only` ⊆ allowlist; archivos señuelo intactos | Determinista | OverEager-Gen |
@@ -249,11 +249,11 @@ Cada ficha incluye opciones, la recomendada, la evidencia y lo que se pierde. Se
 
 | Fase | Entregable | Criterio de salida |
 |---|---|---|
-| **F0 — Spike Harbor** | Tarea smoke en formato Harbor; `vanilla-default`, `vanilla-bare` y una variante plugin vía la subclase | Gate de contaminación funcionando; OTel etiquetado por variante; confirmado que los tests no son visibles al agente |
+| **F0 — Spike Harbor** | Tarea smoke en formato Harbor; `vanilla-default`, `vanilla-bare` y una variante plugin vía la subclase | Gate de contaminación funcionando; costo y tokens por variante; confirmado que los tests no son visibles al agente |
 | **F1 — Absorber navori-evals** | Migrar `00-smoke` y los aprendizajes ([06](docs/research/06-antecedentes-navori-evals.md)); archivar navori-evals | Nada útil queda solo en el prototipo |
 | **F2 — Suite v1** | Paciente + 12–15 tareas + oráculos + corrida tramposa + holdout | Checklist por tarea en verde; piloto calibrado |
 | **F3 — Ronda 1** | `RULES.md` pre-registrado; 5–6 variantes (vanilla ×2, navori, gentle-ai, superpowers, ponytail, placebo) | Reporte completo y transcripts de las fallas revisados |
-| **F4 — Reporte/dashboard** | Vistas de §11 generadas automáticamente | Reproducible desde `results/` |
+| **F4 — Reporte/dashboard** | Vistas de §11 generadas automáticamente; OTel por skill/herramienta si el desglose lo pide | Reproducible desde `results/` |
 | **F5 — Más allá de Claude Code** | Variantes con codex/opencode (adaptadores de Harbor) y agentes propios (`BaseAgent`) | Una ronda mixta |
 
 ## 14. Trampas a vigilar
