@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** pausado — F0 (spike Harbor). Siguiente paso: validar con datos reales las variantes con plugin (superpowers, ponytail) y el probe 01, con presupuesto mínimo (el usuario tiene pocos tokens).
+**Estado:** pausado — F0 cerrado. Siguiente paso: F1 (absorber navori-evals, VISION §13), con presupuesto mínimo de tokens.
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
@@ -12,7 +12,7 @@ Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas 
 - [x] Review completo del esqueleto `owl/` + `tasks/` antes del primer commit
 - [x] `.env` con `CLAUDE_CODE_OAUTH_TOKEN` (validar gratis con curl a /v1/models)
 - [x] Corrida real mínima: vanilla-default y codex-default × 00-smoke, k=1 → ambas PASS
-- [ ] Corrida real de superpowers + ponytail y del probe 01 (una a la vez, k=1)
+- [x] Corrida real de superpowers + ponytail y del probe 01 (k=1): PASS; probe corregido (estado de runtime en ~/.claude)
 - [x] Gate ajustado con datos reales: plugins `builtin` aparte; eventos de Codex confirmados
 - [x] Baseline Codex (`codex-default`, suscripción ChatGPT) adelantado de F5
 - [x] OTel fuera de F0 → F4 (confirmado por el usuario; VISION §5 y §13 actualizados)

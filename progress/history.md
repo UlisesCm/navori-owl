@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-24 10:15 orchestrator — Cierre de F0: variantes con plugin, probe real y runners compilados
+- Cambios: tasks/01-probe/tests/test.sh (`home_claude_clean` por deny-list, fail-closed), owl/gate.py (reward.json inválido → FAIL sin crash), variants/ponytail.yaml (MCP confirmado), docs/research/07.
+- Quality gate: ✅ ruff check . verde (reviewer Pass 2, APPROVED tras una ronda de CHANGES_REQUESTED).
+- Notas: corridas k=1: superpowers 00-smoke reward=1 ($0.066), ponytail reward=1 ($0.037, sin MCP), vanilla-default 01-probe con falso negativo por estado de runtime en ~/.claude (backups/downloads/sessions), corregido. Skills del init: vanilla solo trae las de Claude Code; superpowers agrega exactamente superpowers:*. No hay equivalente de Harbor en Rust/Go (docs/research/07): nos quedamos en Harbor. F0 cumple su criterio de salida.
+- Commit / PR: branch fix/probe-runtime-state
+
 ## 2026-09-24 09:40 orchestrator — Soporte Codex en owl y primeras corridas reales
 - Cambios: owl/cli.py (agente codex de Harbor, modelo por agente, auth de suscripción para ambos), owl/gate.py (gate por agente; plugins builtin aparte), variants/codex-default.yaml, README (uso), VISION §13.
 - Quality gate: ✅ ruff check . verde (reviewer Pass 2, APPROVED).
