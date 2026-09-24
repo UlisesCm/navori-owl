@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from owl.gate import check_jobs, write_report
+from owl.tasks import resolve_task_args
 from owl.variants import ROOT, Variant
 
 AGENT_IMPORT_PATHS = {
@@ -112,9 +113,9 @@ def cmd_run(args: argparse.Namespace) -> int:
     jobs_dir = (ROOT / args.jobs_dir).resolve()
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     rng = random.Random(args.seed)
+    task_paths = resolve_task_args(args.task, args.suite, args.holdout)
 
-    for task in args.task:
-        task_path = Path(task).resolve()
+    for task_path in task_paths:
         # Interleave variants per repetition so API drift and prompt caching hit every arm alike.
         for rep in range(1, args.k + 1):
             order = variants[:]
@@ -161,7 +162,15 @@ def main() -> None:
 
     run = sub.add_parser("run", help="Run variants on tasks (interleaved) through Harbor.")
     run.add_argument("-v", "--variant", action="append", required=True)
-    run.add_argument("-t", "--task", action="append", required=True)
+    run.add_argument("-t", "--task", action="append", help="Repeatable. Required unless --suite.")
+    run.add_argument(
+        "--suite", action="store_true",
+        help="Run every suite task under tasks/ (R4/R5; excludes tasks/00-smoke, tasks/01-probe).",
+    )
+    run.add_argument(
+        "--holdout", action="store_true",
+        help="With --suite, also include holdout/. Required to run any holdout task at all (R15).",
+    )
     run.add_argument("-k", type=int, default=1, help="Trials per variant and task.")
     run.add_argument(
         "-m", "--model", default=None,
@@ -179,6 +188,7 @@ def main() -> None:
     gate = sub.add_parser("gate", help="Check contamination and model reachability of trials.")
     gate.add_argument("jobs_dir", nargs="?", default="jobs")
     gate.set_defaults(func=cmd_gate)
+
 
     args = parser.parse_args()
     sys.exit(args.func(args))
