@@ -1,0 +1,6 @@
+node_modules/
+data/tmp/*
+!data/tmp/.gitkeep
+data/backups/*
+!data/backups/README.md
+data/*.db

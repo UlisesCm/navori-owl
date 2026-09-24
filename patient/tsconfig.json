@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "allowJs": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@opsdesk/core": ["packages/core/src/index.ts"],
+      "@opsdesk/db": ["packages/db/src/index.ts"],
+      "@opsdesk/api": ["packages/api/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts"],
+  "exclude": ["**/node_modules/**", "**/test/**"]
+}
