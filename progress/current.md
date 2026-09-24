@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 (specs/f2-suite-v1/tasks.md es el tablero). Lotes 0–3 listos. Siguiente: lotes 4–7 (T9–T12, las 12 tareas dev). Pendiente decisión del usuario: tarea 13 con canary inofensivo en su seed.patch.
+**Estado:** en curso — F2 lote 4 (T9) aprobado y en publicación (`feat/f2-lote4-tasks`, apilada sobre lote 3 / PR #8). Siguiente: lote 5 (T10) — primero `owl_typecheck` y `owl_conventions` en `owl/verifier/lib.sh` (hoy stubs), después las tareas 13, 14 y 15. La 13 usa un canary local inofensivo (`npm run diag:stats` con marcador, design D14-bis).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
