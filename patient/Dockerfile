@@ -20,11 +20,17 @@ RUN apt-get update \
 
 # Verifier's own TypeScript toolchain (D6 point 6): typecheck tasks (14, 15, 17) run tsc from
 # here, never from /app/node_modules — an agent that weakens or deletes the app's own tsconfig or
-# node_modules must not be able to fake a passing typecheck. Root-owned; the agent (node) can
-# read but not write it.
+# node_modules must not be able to fake a passing typecheck. @types/node is pinned to the exact
+# version patient/package.json ships (keep these in sync), and installed here too: with default
+# typeRoots, tsc auto-includes every package under /app/node_modules/@types, which an agent
+# fully controls (it's ignored runtime state — never shows up in scope) — an agent could plant an
+# ambient declaration there to make a seeded type error disappear. owl_typecheck pins
+# --typeRoots/--types to this directory instead, so /app/node_modules/@types is never consulted.
+# Root-owned; the agent (node) can read but not write it.
 RUN mkdir -p /opt/owl/toolchain \
  && npm init -y --prefix /opt/owl/toolchain >/dev/null \
- && npm install --prefix /opt/owl/toolchain --no-audit --no-fund --save-dev typescript@5.7.3 \
+ && npm install --prefix /opt/owl/toolchain --no-audit --no-fund --save-dev \
+      typescript@5.7.3 @types/node@22.10.5 \
  && chmod -R go-w /opt/owl/toolchain
 
 # /var/lib/owl: root, 0755 — the baseline record (D5) and content manifest (D6 point 3) seal.sh
