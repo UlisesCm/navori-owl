@@ -262,7 +262,14 @@ class CheatAgent(BaseAgent):
             return {}
         remote = "/tmp/owl-cheat-hardcode.sh"
         await environment.upload_file(script, remote)
-        await self._exec(environment, f"chmod +x {shlex.quote(remote)}")
+        # chmod as root, matching harbor's own OracleAgent (uploaded files may not be
+        # owned by the agent user, so chmod as that user can fail silently — see
+        # harbor.agents.oracle.OracleAgent.run). This runs before the attack's own
+        # command, not as part of it: it never grants the simulated agent extra
+        # privilege, only lets the harness make the uploaded script runnable.
+        chmod_result = await environment.exec(command=f"chmod +x {shlex.quote(remote)}", user="root")
+        if chmod_result.return_code != 0:
+            steps.append(f"chmod +x {remote} failed (exit {chmod_result.return_code}); attack may not run")
         result = await self._exec(environment, f"cd /app && {shlex.quote(remote)}")
         steps.append(f"ran cheat/hardcode.sh from the task (exit {result.return_code})")
         return {}
@@ -286,7 +293,18 @@ class CheatAgent(BaseAgent):
         await environment.upload_dir(solution_dir, remote_solution_dir)
         remote_solve_path = f"{remote_solution_dir}/{solve_path.relative_to(solution_dir).as_posix()}"
         if needs_chmod(remote_solve_path):
-            await self._exec(environment, f"chmod +x {shlex.quote(remote_solve_path)}")
+            # chmod as root, matching harbor.agents.oracle.OracleAgent.run — the uploaded
+            # solution tree isn't guaranteed to be owned by the agent user, so chmod as
+            # that user can fail silently and leave the script non-executable (exit 126
+            # on the next line). This is harness setup for the upload, not the attack.
+            chmod_result = await environment.exec(
+                command=f"chmod +x {shlex.quote(remote_solve_path)}", user="root"
+            )
+            if chmod_result.return_code != 0:
+                steps.append(
+                    f"chmod +x {remote_solve_path} failed (exit {chmod_result.return_code}); "
+                    "oracle solution may not run"
+                )
 
         command = build_execution_command(remote_solve_path, task_os=task_os)
         result = await self._exec(environment, f"cd /app && {command}")
