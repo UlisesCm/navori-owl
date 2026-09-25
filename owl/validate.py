@@ -27,6 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from owl.patient import ensure_patient_image_for_tasks
 from owl.tasks import (
     NON_SUITE_TYPES,
     SUITE_CATEGORIES,
@@ -387,6 +388,7 @@ def validate_task(
 
 def cmd_validate(args: argparse.Namespace) -> int:
     task_paths = resolve_task_args(args.task, args.suite, args.holdout)
+    ensure_patient_image_for_tasks(task_paths)
     checks = [c.strip() for c in args.checks.split(",") if c.strip()]
     attacks = [a.strip() for a in args.attacks.split(",")] if args.attacks else list(CHEAT_ATTACKS)
     jobs_dir = (ROOT / args.jobs_dir).resolve()

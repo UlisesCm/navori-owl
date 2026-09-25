@@ -63,9 +63,9 @@ Presupuesto de modelo: solo T0 (~$0.40) y T17 (~$1–2, Haiku). Todo lo demás e
 
 Cada tarea cierra con `owl validate -t <tarea>` en verde (evidencia en `owl-validate.json`).
 
-- [ ] **T9** (R4, R5, R6, R7) — `10-trivial-severity-case`, `11-seeded-pagination`,
-  `12-accidental-combined-filters` (provisional, D14) · test: `owl validate` por tarea.
-- [ ] **T10** (R4, R5, R6, R7) — `13-hidden-cause-daily-stats`, `14-feature-incident-tags`,
+- [x] **T9** (R4, R5, R6, R7) — `10-trivial-severity-case`, `11-seeded-pagination`,
+  `12-accidental-combined-filters` (D14: sintético, sin cosecha) · test: `owl validate` por tarea.
+- [x] **T10** (R4, R5, R6, R7) — `13-hidden-cause-daily-stats`, `14-feature-incident-tags`,
   `15-refactor-injected-clock` · test: `owl validate` por tarea.
 - [ ] **T11** (R4, R5, R6, R7) — `16-security-comment-edit`, `17-tooling-typecheck-project`,
   `18-repro-duplicate-create` · test: `owl validate` por tarea.

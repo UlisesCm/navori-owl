@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { FixedClock } from "@opsdesk/core";
 import { openDb } from "../src/db.ts";
 import { IncidentsRepo } from "../src/incidents-repo.ts";
@@ -74,6 +77,23 @@ test("transition to resolved sets resolvedAt once", () => {
   incidents.create("i1", { tenantId: "t1", service: "api", severity: "SEV2", title: "slow" });
   const resolved = incidents.transition("t1", "i1", "resolved", 1);
   assert.ok(resolved.resolvedAt);
+});
+
+test("opening the same on-disk file twice does not re-run migrations", () => {
+  const dir = mkdtempSync(join(tmpdir(), "opsdesk-db-test-"));
+  const path = join(dir, "opsdesk.db");
+  try {
+    const first = openDb(path);
+    first.prepare("INSERT INTO tenants (id, name) VALUES (?, ?)").run("t1", "Tenant One");
+    first.close();
+
+    const second = openDb(path);
+    const row = second.prepare("SELECT name FROM tenants WHERE id = ?").get("t1") as { name: string } | undefined;
+    assert.equal(row?.name, "Tenant One");
+    second.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("comments are scoped by tenant", () => {

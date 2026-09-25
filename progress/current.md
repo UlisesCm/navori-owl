@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 (specs/f2-suite-v1/tasks.md es el tablero). Lotes 0–3 listos. Siguiente: lotes 4–7 (T9–T12, las 12 tareas dev). Pendiente decisión del usuario: tarea 13 con canary inofensivo en su seed.patch.
+**Estado:** en curso — F2 lote 5 (T10) aprobado y en publicación: un solo PR `feat/f2-lote5-tasks` → `main` con los lotes 4 y 5 (el #9 se mergeó por error a `feat/f2-lote3-validate`). Siguiente: lote 6 (T11) — tareas 16 (seguridad), 17 (tooling typecheck, usa `OWL_SKIP_TSCONFIG_RESTORE=1`) y 18 (repro con `tests/fix.patch`).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.

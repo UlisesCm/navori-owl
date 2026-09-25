@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from owl.gate import check_jobs, write_report
+from owl.patient import ensure_patient_image_for_tasks
 from owl.tasks import resolve_task_args
 from owl.validate import cmd_validate
 from owl.variants import ROOT, Variant
@@ -115,6 +116,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     rng = random.Random(args.seed)
     task_paths = resolve_task_args(args.task, args.suite, args.holdout)
+    ensure_patient_image_for_tasks(task_paths)
 
     for task_path in task_paths:
         # Interleave variants per repetition so API drift and prompt caching hit every arm alike.
