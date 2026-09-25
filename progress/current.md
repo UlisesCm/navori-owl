@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 lote 5 (T10) aprobado y en publicación: un solo PR `feat/f2-lote5-tasks` → `main` con los lotes 4 y 5 (el #9 se mergeó por error a `feat/f2-lote3-validate`). Siguiente: lote 6 (T11) — tareas 16 (seguridad), 17 (tooling typecheck, usa `OWL_SKIP_TSCONFIG_RESTORE=1`) y 18 (repro con `tests/fix.patch`).
+**Estado:** en pausa — lotes 4 y 5 de F2 (T9, T10) publicados en el PR #10 → `main`, esperando merge. Siguiente: al mergear #10, lote 6 (T11) desde `main` — tareas 16 (seguridad), 17 (tooling typecheck, usa `OWL_SKIP_TSCONFIG_RESTORE=1`) y 18 (repro con `tests/fix.patch`). Pendiente de OK del usuario: borrar la branch remota `feat/f2-lote3-validate` (ahí cayó por error el merge del #9).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
