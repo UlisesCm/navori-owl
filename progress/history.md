@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-24 22:30 orchestrator — F2 lote 5: tareas 13–15, typecheck, convenciones y dimensiones por tarea
+- Cambios: owl/verifier/lib.sh (owl_typecheck con tipos solo del toolchain, owl_conventions M1–M6 por contenido, owl_dim con fail-closed) y sus copias; patient/Dockerfile (@types/node en /opt/owl/toolchain); patient/packages/db/src/db.ts (registra migraciones aplicadas: el CLI fallaba en la segunda llamada); owl/agents/cheat.py (chmod como root); tasks/13-hidden-cause-daily-stats, tasks/14-feature-incident-tags, tasks/15-refactor-injected-clock; design D2, D6, D7 y Contracts.
+- Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (77 passed, 1 skipped; reviewer APPROVED). 44 pruebas docker verdes. owl validate de 00 y 10–15 en verde, sin modelo.
+- Notas: huecos cerrados antes de las tareas: owl_finish ignoraba en silencio dimensiones de owl_reward que no conocía (decoy_intact no gateaba) y tsc tomaba @types de /app/node_modules. M3 exigía guion y el paciente usa guion bajo. El PR #9 se mergeó a feat/f2-lote3-validate y no a main: el lote 4 sube en el mismo PR que el lote 5 (decisión del usuario). Issue navori-harness#1038 abierto (receipt "mode only").
+- Commit / PR: branch feat/f2-lote5-tasks
+
 ## 2026-09-24 16:48 orchestrator — F2 lote 4: tareas 10–12 y fixes de sellado y P2P
 - Cambios: tasks/10-trivial-severity-case, tasks/11-seeded-pagination, tasks/12-accidental-combined-filters (sintética, decisión del usuario); patient/seal.sh (reflog/gc antes del chown + guard de ownership); owl/verifier/lib.sh (tsconfig se restaura pero no va a `node --test`) y sus 4 copias; owl/agents/cheat.py (move-baseline reporta si el commit falló); owl/patient.py (reconstruye owl-patient:local por label owl.patient_hash, prometido en D3 y no implementado); patient/docs/runbooks/stats.md sin el párrafo que delataba la inyección; design D3, D14 y D14-bis.
 - Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (77 passed, 1 skipped; reviewer APPROVED). owl validate de 00-smoke, 10, 11 y 12 en verde, sin modelo.

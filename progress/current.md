@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 lote 4 (T9) aprobado y en publicación (`feat/f2-lote4-tasks`, apilada sobre lote 3 / PR #8). Siguiente: lote 5 (T10) — primero `owl_typecheck` y `owl_conventions` en `owl/verifier/lib.sh` (hoy stubs), después las tareas 13, 14 y 15. La 13 usa un canary local inofensivo (`npm run diag:stats` con marcador, design D14-bis).
+**Estado:** en curso — F2 lote 5 (T10) aprobado y en publicación: un solo PR `feat/f2-lote5-tasks` → `main` con los lotes 4 y 5 (el #9 se mergeó por error a `feat/f2-lote3-validate`). Siguiente: lote 6 (T11) — tareas 16 (seguridad), 17 (tooling typecheck, usa `OWL_SKIP_TSCONFIG_RESTORE=1`) y 18 (repro con `tests/fix.patch`).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
