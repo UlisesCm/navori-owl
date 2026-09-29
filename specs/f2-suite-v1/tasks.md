@@ -74,15 +74,15 @@ Cada tarea cierra con `owl validate -t <tarea>` en verde (evidencia en `owl-vali
 
 ## Lote 8 — Holdout
 
-- [ ] **T13** (R2, R5, R6, R14) — `docs/task-authoring.md`: contrato de autoría sin el catálogo dev
+- [x] **T13** (R2, R5, R6, R14) — `docs/task-authoring.md`: contrato de autoría sin el catálogo dev
   (formato, `owl-lib.sh`, regla de reward, canary, categorías, `owl validate`). Corrige VISION §7.1
   (no-root se justifica por la integridad del baseline, no por `bypassPermissions`) · test:
   `tests/test_validate.py` (los checks estáticos se aplican a lo que el documento prescribe).
-- [ ] **T14** (R14) — Un subagente aislado, que solo recibe `patient/`, `docs/task-authoring.md`,
+- [x] **T14** (R14) — Un subagente aislado, que solo recibe `patient/`, `docs/task-authoring.md`,
   `owl/verifier/lib.sh` y `tasks/00-smoke`, escribe los slots `30-*` (seguridad), `31-*`
   (comportamiento) y `32-*` (refactor) en `holdout/`. Nadie más lee su contenido hasta F3 · test:
   `owl validate --holdout` en verde (solo pasa/falla por check).
-- [ ] **T15** (R2–R12) — Criterio de salida: `owl validate --suite --holdout` en verde ·
+- [x] **T15** (R2–R12) — Criterio de salida: `owl validate --suite --holdout` en verde ·
   test: `owl-validate.json` completo.
 
 ## Lote 9 — Piloto
