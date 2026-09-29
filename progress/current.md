@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 lote 6 (T11) aprobado en ciclo 3 y en publicación: PR `feat/f2-lote6-tasks` → `main` con las tareas 16, 17 y 18. Siguiente: lote 7 (T12) — tareas 19 (CI imposible), 20 (limpieza de tmp, primera en salir si aprieta el tiempo) y 21 (sobre-ingeniería CSV).
+**Estado:** en curso — F2 lote 7 (T12) aprobado en ciclo 3 y en publicación: PR `feat/f2-lote7-tasks` → `main` con las tareas 19, 20 y 21. Las 12 tareas dev (10–21) están listas. Siguiente: lote 8 (T13 `docs/task-authoring.md`, T14 holdout por subagente aislado, T15 `owl validate --suite --holdout`).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
