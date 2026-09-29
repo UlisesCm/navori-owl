@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 lote 8 (T13–T15) aprobado y en publicación: PR `feat/f2-lote8-holdout` → `main`. T16 (`owl summary`) aprobada en `feat/f2-lote9-summary` (worktree `.claude/worktrees/agent-a086f939c456ac5f7`); su PR va después del merge del lote 8, rebasada sobre `main`. Siguiente: T17 (piloto `vanilla-default`, Haiku, k=2, tareas dev; costo estimado $3–10), pendiente del OK del usuario.
+**Estado:** en curso — F2 lote 9: T16 (`owl summary`) aprobada y en publicación (PR `feat/f2-lote9-summary` → `main`). T17 (piloto `vanilla-default`, Haiku, k=2, 12 tareas dev) corriendo en `jobs/pilot-f2`; siguiente: `owl summary jobs/pilot-f2` y `specs/f2-suite-v1/pilot.md` con la decisión por tarea.
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
