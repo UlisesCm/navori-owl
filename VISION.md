@@ -166,7 +166,7 @@ Las instalaciones exactas de cada candidato están en [04 §2](docs/research/04-
 
 Receta, respaldada por la doc oficial de Claude Code y por lo que ya hacen Harbor y Quorum ([05 §4](docs/research/05-herramientas-y-proyectos-paralelos.md)):
 
-1. **Contenedor efímero**, usuario no-root (Claude Code rechaza `--dangerously-skip-permissions` como root), versión de Claude Code fijada y `DISABLE_AUTOUPDATER=1`.
+1. **Contenedor efímero**, usuario no-root, versión de Claude Code fijada y `DISABLE_AUTOUPDATER=1`. El no-root se justifica por la integridad del baseline (el agente no debe poder reescribir el registro y el manifiesto del baseline, propiedad de root) y por la separación de privilegios del verifier, no por el modo de permisos: Claude Code corre con `bypassPermissions` como root si se le fija `IS_SANDBOX=1`.
 2. **`HOME` y `CLAUDE_CONFIG_DIR` vacíos por trial.** Así se evita la contaminación desde `~/.claude`, `~/.engram`, `~/.navori` y los plugins del usuario.
 3. **Fixture idéntico para todas las variantes:** commit único, sin remotes, tags ni reflog. Así se cierra la fuga por historial de git (SWE-bench #465).
 4. **Tests y oráculo fuera del sandbox** durante la corrida; se montan solo al verificar.
@@ -240,6 +240,8 @@ Detalle y catálogo de tareas de comportamiento (B1–B13): [03](docs/research/0
 - El oráculo corre 5 veces sin flaky.
 - Dificultad calibrada con un piloto: el baseline entre 30% y 70%.
 
+**Suites por perfil (dirección futura, fuera de F2/F3):** la suite v1 es el primer perfil (backend TS sobre un paciente). Otros perfiles (problemas simples vs. proyectos avanzados, frontend, ciberseguridad, arquitectura, búsqueda de bugs, features nuevas; la lista está abierta) pueden requerir su propio paciente: frontend necesita una imagen con navegador, diferido en F2 por eso. La categoría por tarea (`owl_type`) y la separación suite/holdout ya permiten agrupar. Los reportes comparan por suite; nunca se mezclan suites en un solo puntaje.
+
 ## 11. Reportes
 
 1. **Tabla por tarea** (siempre): éxitos por variante, costo y alertas de comportamiento.
@@ -278,6 +280,7 @@ Cada ficha incluye opciones, la recomendada, la evidencia y lo que se pierde. Se
 | **F3 — Ronda 1** | `RULES.md` pre-registrado; 5–6 variantes (vanilla ×2, navori, gentle-ai, superpowers, ponytail, placebo) | Reporte completo y transcripts de las fallas revisados |
 | **F4 — Reporte/dashboard** | Vistas de §11 generadas automáticamente; OTel por skill/herramienta si el desglose lo pide | Reproducible desde `results/` |
 | **F5 — Más allá de Claude Code** | Variantes con codex/opencode (adaptadores de Harbor) y agentes propios (`BaseAgent`) | Una ronda mixta |
+| **F6 — Suites por perfil** | Varias suites seleccionables por perfil, cada una con su criterio de salida heredado del checklist de F2 | Al menos una segunda suite validada con `owl validate` y un reporte que compare variantes por suite |
 
 `codex-default` (baseline, sin harness) se adelantó de F5: ya corre por `owl run`/`owl gate` vía el agente
 `codex` nativo de Harbor. El harness/plugins de Codex sigue en F5.

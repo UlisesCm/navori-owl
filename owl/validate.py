@@ -2,7 +2,7 @@
 
 Two phases per task:
 1. **Static** (no Docker): the canary GUID, `tests/owl-lib.sh` byte-identity with the
-   canonical `owl/verifier/lib.sh`, `owl_reward subseteq owl_dimensions`, a valid `owl_type`,
+   canonical `owl/verifier/lib.sh`, `owl_reward subseteq owl_dimensions`, required files/exec bits, non-empty metadata, a valid `owl_type`,
    and holdout path/metadata coherence.
 2. **Dynamic** (Harbor, still free): an oracle JobConfig (`n_attempts=5`) and a nop+CheatAgent
    JobConfig (one `AgentConfig` per attack, D8), run with `harbor run -c`, **never**
@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -113,6 +114,55 @@ def _check_holdout_coherence(task_dir: Path) -> tuple[bool, str]:
     return True, "holdout path and metadata agree"
 
 
+#: Files every task needs / files only suite tasks need (`smoke`, `infra-probe` are fixtures
+#: with no hardcode attack, no scope file and no target dimension). Second element: must be
+#: executable (the oracle, the verifier entry point and the hardcode attack are all run).
+_REQUIRED_FILES_ALL: list[tuple[str, bool]] = [
+    ("instruction.md", False),
+    ("task.toml", False),
+    ("environment/Dockerfile", False),
+    ("solution/solve.sh", True),
+    ("tests/test.sh", True),
+]
+_REQUIRED_FILES_SUITE: list[tuple[str, bool]] = [
+    ("tests/owl-lib.sh", False),
+    ("tests/scope.allow", False),
+    ("cheat/hardcode.sh", True),
+]
+
+
+def _check_required_files(task_dir: Path, info: TaskInfo) -> tuple[bool, str]:
+    required = list(_REQUIRED_FILES_ALL)
+    if info.owl_type not in NON_SUITE_TYPES:
+        required += _REQUIRED_FILES_SUITE
+    problems = []
+    for rel, executable in required:
+        path = task_dir / rel
+        if not path.is_file():
+            problems.append(f"{rel} missing")
+        elif executable and not os.access(path, os.X_OK):
+            problems.append(f"{rel} not executable (fix: chmod +x {rel})")
+    if problems:
+        return False, "; ".join(problems)
+    return True, "all required task files present, scripts executable"
+
+
+def _check_metadata(info: TaskInfo) -> tuple[bool, str]:
+    """`owl_dimensions`/`owl_reward` non-empty for every task; suite tasks also need an
+    `owl_target_dimension`. It is NOT required to be in `owl_dimensions`: it may name a
+    cross-run metric (`cost`, `success`, `footprint`) that no reward.json key carries."""
+    problems = []
+    if not info.owl_dimensions:
+        problems.append("owl_dimensions missing or empty")
+    if not info.owl_reward:
+        problems.append("owl_reward missing or empty")
+    if info.owl_type not in NON_SUITE_TYPES and not (info.owl_target_dimension or "").strip():
+        problems.append("owl_target_dimension missing or empty")
+    if problems:
+        return False, "; ".join(problems)
+    return True, "owl_dimensions, owl_reward and owl_target_dimension are set"
+
+
 def static_checks(task_dir: Path) -> dict[str, tuple[bool, str]]:
     """Run every static check (D9 §1) on one task directory. Returns check name -> (ok, reason)."""
     try:
@@ -124,6 +174,8 @@ def static_checks(task_dir: Path) -> dict[str, tuple[bool, str]]:
         "canary": _check_canary(task_dir),
         "lib_identity": _check_lib_identity(task_dir),
         "reward_subset": _check_reward_subset(info),
+        "required_files": _check_required_files(task_dir, info),
+        "metadata": _check_metadata(info),
         "category": _check_category(info),
         "holdout_coherence": _check_holdout_coherence(task_dir),
     }
@@ -141,6 +193,22 @@ def evaluate_oracle(rewards: list[dict[str, Any]]) -> tuple[bool, list[str]]:
     for i, r in enumerate(rewards):
         if r.get("reward") != 1:
             reasons.append(f"oracle trial {i}: reward={r.get('reward')!r}, expected 1")
+    return (not reasons, reasons)
+
+
+def evaluate_dimensions(owl_dimensions: list[str], rewards: list[dict[str, Any]]) -> tuple[bool, list[str]]:
+    """D9 §3: `owl_dimensions` must equal the key set of every oracle `reward.json`."""
+    declared = set(owl_dimensions)
+    reasons = []
+    if not rewards:
+        reasons.append("no oracle reward.json to compare owl_dimensions against")
+    for i, r in enumerate(rewards):
+        actual = set(r)
+        if actual != declared:
+            reasons.append(
+                f"oracle trial {i}: owl_dimensions != reward.json keys "
+                f"(declared only: {sorted(declared - actual)}, reward.json only: {sorted(actual - declared)})"
+            )
     return (not reasons, reasons)
 
 
@@ -168,6 +236,7 @@ def evaluate_cheat(
     nop_reward: dict[str, Any],
     owl_reward_keys: list[str],
     cheat_json: dict[str, Any] | None = None,
+    hardcode_script_present: bool = True,
 ) -> tuple[bool, list[str]]:
     """R10: per-attack expectations from D8's table.
 
@@ -178,6 +247,9 @@ def evaluate_cheat(
     not that the attack also broke something outside the gate.
     """
     reasons = []
+    if attack == "hardcode" and not hardcode_script_present:
+        # Without cheat/hardcode.sh the attack is a no-op that passes trivially: fail loudly.
+        reasons.append("hardcode: cheat/hardcode.sh missing, the attack ran nothing")
     if reward.get("reward") != 0:
         reasons.append(f"{attack}: reward={reward.get('reward')!r}, expected 0")
 
@@ -285,6 +357,8 @@ def run_dynamic_checks(
         rewards = [_trial_reward(t) or {} for t in _collect_trial_dirs(job_dir)]
         ok, reasons = evaluate_oracle(rewards)
         result["oracle"] = {"rewards": rewards, "ok": ok, "reasons": reasons}
+        dims_ok, dims_reasons = evaluate_dimensions(TaskInfo.load(task_dir).owl_dimensions, rewards)
+        result["dimensions"] = {"ok": dims_ok, "reasons": dims_reasons}
 
     if "nop" in checks or "cheat" in checks:
         run_attacks = attacks if "cheat" in checks else []
@@ -315,7 +389,12 @@ def run_dynamic_checks(
                 attack = (agent.get("kwargs") or {}).get("attack", "?")
                 reward = _trial_reward(trial_dir) or {}
                 cheat_json = _trial_cheat_json(trial_dir)
-                ok, reasons = evaluate_cheat(attack, reward, nop_reward, info.owl_reward, cheat_json)
+                # Suite tasks must ship a hardcode script (static `required_files`); the
+                # non-suite fixtures (smoke, infra-probe) legitimately have none.
+                hardcode_ok = info.owl_type in NON_SUITE_TYPES or (task_dir / "cheat" / "hardcode.sh").is_file()
+                ok, reasons = evaluate_cheat(
+                    attack, reward, nop_reward, info.owl_reward, cheat_json, hardcode_script_present=hardcode_ok
+                )
                 cheat_results[attack] = {"reward": reward, "ok": ok, "reasons": reasons}
             result["cheat"] = cheat_results
 
@@ -366,6 +445,9 @@ def validate_task(
         entry["oracle"] = (
             _redact_section(oracle["ok"], "oracle") if is_holdout else oracle
         )
+    if "dimensions" in dynamic:
+        dims = dynamic["dimensions"]
+        entry["dimensions"] = _redact_section(dims["ok"], "dimensions") if is_holdout else dims
     if "nop" in dynamic:
         nop = dynamic["nop"]
         entry["nop"] = _redact_section(nop["ok"], "nop") if is_holdout else nop
@@ -376,7 +458,7 @@ def validate_task(
         )
 
     all_ok = static_ok
-    for key in ("oracle", "nop"):
+    for key in ("oracle", "dimensions", "nop"):
         if key in entry:
             all_ok = all_ok and bool(entry[key].get("ok"))
     if "cheat" in entry:
@@ -402,7 +484,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
         results.append(entry)
         status = "PASS" if entry["ok"] else "FAIL"
         print(f"{status}  {entry['task']}" + ("  [holdout]" if entry["holdout"] else ""))
-        for section in ("static", "oracle", "nop"):
+        for section in ("static", "oracle", "dimensions", "nop"):
             if section in entry and not entry[section].get("ok"):
                 for reason in entry[section].get("reasons", []):
                     print(f"      - {section}: {reason}")

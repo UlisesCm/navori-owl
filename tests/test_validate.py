@@ -7,13 +7,19 @@ holdout report redaction (D10). No Docker, no model calls — job directories ar
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
+from owl.tasks import NON_SUITE_TYPES, SUITE_CATEGORIES
 from owl.validate import (
+    _CANARY_GLOBS,
     CANARY_GUID,
+    CANONICAL_LIB,
+    CHEAT_ATTACKS,
     evaluate_cheat,
+    evaluate_dimensions,
     evaluate_nop,
     evaluate_oracle,
     run_dynamic_checks,
@@ -39,6 +45,7 @@ def _write_fixture_task(base: Path, name: str = "16-security-x", *, owl_type: st
 owl_type = "{owl_type}"
 owl_dimensions = ["reward", "f2p", "p2p", "security"]
 owl_reward = ["f2p", "security"]
+owl_target_dimension = "security"
 owl_holdout = {"true" if owl_holdout else "false"}
 """
     )
@@ -48,6 +55,11 @@ owl_holdout = {"true" if owl_holdout else "false"}
     (task_dir / "tests" / "test.sh").write_text(canary + "#!/bin/bash\n")
     (task_dir / "tests" / "sub" / "helper.sh").write_text(canary + "# helper\n")
     (task_dir / "solution" / "solve.sh").write_text(canary + "#!/bin/bash\n")
+    (task_dir / "tests" / "scope.allow").write_text(canary + "src/\n")
+    (task_dir / "cheat").mkdir()
+    (task_dir / "cheat" / "hardcode.sh").write_text(canary + "#!/bin/bash\n")
+    for script in ("solution/solve.sh", "tests/test.sh", "cheat/hardcode.sh"):
+        (task_dir / script).chmod(0o755)
     return task_dir
 
 
@@ -350,7 +362,7 @@ def test_validate_task_holdout_report_has_no_content(tmp_path: Path, monkeypatch
 
     oracle_job = tmp_path / "jobs" / "oracle-job"
     for i in range(5):
-        _write_trial(oracle_job, f"t{i}", {"name": "oracle"}, {"reward": 1})
+        _write_trial(oracle_job, f"t{i}", {"name": "oracle"}, {"reward": 1, "f2p": 1, "p2p": 1, "security": 1})
     nop_cheat_job = tmp_path / "jobs" / "nop-cheat-job"
     _write_trial(nop_cheat_job, "nop", {"name": "nop"}, {"reward": 0, "p2p": 1})
 
@@ -362,11 +374,27 @@ def test_validate_task_holdout_report_has_no_content(tmp_path: Path, monkeypatch
     serialized = json.dumps(entry)
     assert "reward" not in serialized  # no reward.json content, no free-text key named "reward"
     assert str(task_dir) in serialized  # the task path itself is fine, it's not "content"
-    for section in ("static", "oracle", "nop"):
+    for section in ("static", "oracle", "dimensions", "nop"):
         assert set(entry[section].keys()) == {"ok", "reasons"}
         for reason in entry[section]["reasons"]:
             # Holdout reasons are check names only, e.g. "oracle" — never a sentence quoting values.
             assert " " not in reason
+
+
+# Covers: R14
+def test_validate_task_holdout_redacts_failing_dimensions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A failing `dimensions` check on a holdout task exposes only the check name, never the key diff."""
+    task_dir = _write_fixture_task(tmp_path / "holdout", name="30-security-x", owl_holdout=True)
+    oracle_job = tmp_path / "jobs" / "oracle-job"
+    for i in range(5):
+        _write_trial(oracle_job, f"t{i}", {"name": "oracle"}, {"reward": 1, "secret_extra_key": 1})
+    _stub_harbor_jobs(monkeypatch, {"-oracle": oracle_job})
+
+    entry = validate_task(task_dir, tmp_path / "jobs", ["oracle"], [])
+
+    assert entry["dimensions"]["ok"] is False
+    assert entry["dimensions"]["reasons"] == ["dimensions"]
+    assert "secret_extra_key" not in json.dumps(entry)
 
 
 def test_validate_task_non_holdout_report_keeps_content(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -374,7 +402,7 @@ def test_validate_task_non_holdout_report_keeps_content(tmp_path: Path, monkeypa
 
     oracle_job = tmp_path / "jobs" / "oracle-job"
     for i in range(5):
-        _write_trial(oracle_job, f"t{i}", {"name": "oracle"}, {"reward": 1})
+        _write_trial(oracle_job, f"t{i}", {"name": "oracle"}, {"reward": 1, "f2p": 1, "p2p": 1, "security": 1})
     nop_cheat_job = tmp_path / "jobs" / "nop-cheat-job"
     _write_trial(nop_cheat_job, "nop", {"name": "nop"}, {"reward": 0, "p2p": 1})
 
@@ -386,3 +414,147 @@ def test_validate_task_non_holdout_report_keeps_content(tmp_path: Path, monkeypa
     assert entry["ok"] is True
     assert len(entry["oracle"]["rewards"]) == 5
     assert entry["nop"]["reward"] == {"reward": 0, "p2p": 1}
+
+
+# Covers: R6
+@pytest.mark.parametrize(
+    "rel",
+    ["instruction.md", "environment/Dockerfile", "solution/solve.sh", "tests/test.sh",
+     "tests/scope.allow", "cheat/hardcode.sh", "tests/owl-lib.sh"],
+)
+def test_static_check_required_files_fails_when_missing(tmp_path: Path, rel: str) -> None:
+    task_dir = _write_fixture_task(tmp_path)
+    (task_dir / rel).unlink()
+    ok, reason = static_checks(task_dir)["required_files"]
+    assert not ok
+    assert f"{rel} missing" in reason
+
+
+# Covers: R6
+@pytest.mark.parametrize("rel", ["solution/solve.sh", "tests/test.sh", "cheat/hardcode.sh"])
+def test_static_check_required_files_fails_when_not_executable(tmp_path: Path, rel: str) -> None:
+    task_dir = _write_fixture_task(tmp_path)
+    (task_dir / rel).chmod(0o644)
+    ok, reason = static_checks(task_dir)["required_files"]
+    assert not ok
+    assert f"{rel} not executable" in reason
+
+
+# Covers: R6
+def test_static_check_required_files_non_suite_fixture_needs_no_hardcode_or_scope(tmp_path: Path) -> None:
+    task_dir = _write_fixture_task(tmp_path, owl_type="smoke")
+    (task_dir / "cheat" / "hardcode.sh").unlink()
+    (task_dir / "tests" / "scope.allow").unlink()
+    assert static_checks(task_dir)["required_files"][0]
+
+
+def _rewrite_metadata(task_dir: Path, old: str, new: str) -> None:
+    toml = task_dir / "task.toml"
+    text = toml.read_text()
+    assert old in text
+    toml.write_text(text.replace(old, new))
+
+
+# Covers: R6
+@pytest.mark.parametrize(
+    ("old", "new", "needle"),
+    [
+        ('owl_reward = ["f2p", "security"]', "owl_reward = []", "owl_reward missing or empty"),
+        ('owl_dimensions = ["reward", "f2p", "p2p", "security"]', "owl_dimensions = []", "owl_dimensions missing or empty"),
+        ('owl_target_dimension = "security"\n', "", "owl_target_dimension missing or empty"),
+        ('owl_target_dimension = "security"', 'owl_target_dimension = "  "', "owl_target_dimension missing or empty"),
+    ],
+)
+def test_static_check_metadata_rejects_empty_or_missing(tmp_path: Path, old: str, new: str, needle: str) -> None:
+    task_dir = _write_fixture_task(tmp_path)
+    _rewrite_metadata(task_dir, old, new)
+    ok, reason = static_checks(task_dir)["metadata"]
+    assert not ok
+    assert needle in reason
+
+
+# Covers: R6
+def test_static_check_metadata_target_may_be_a_virtual_dimension(tmp_path: Path) -> None:
+    """`cost`/`success` are cross-run metrics, not reward.json keys: allowed as target."""
+    task_dir = _write_fixture_task(tmp_path)
+    _rewrite_metadata(task_dir, 'owl_target_dimension = "security"', 'owl_target_dimension = "cost"')
+    assert static_checks(task_dir)["metadata"][0]
+
+
+# Covers: R8
+def test_evaluate_dimensions_equal_key_set_passes() -> None:
+    assert evaluate_dimensions(["reward", "f2p"], [{"f2p": 1, "reward": 1}] * 5) == (True, [])
+
+
+# Covers: R8
+def test_evaluate_dimensions_reports_both_directions() -> None:
+    ok, reasons = evaluate_dimensions(["reward", "f2p", "ghost"], [{"reward": 1, "f2p": 1, "extra": 0}])
+    assert not ok
+    assert "declared only: ['ghost']" in reasons[0]
+    assert "reward.json only: ['extra']" in reasons[0]
+
+
+# Covers: R8
+def test_evaluate_dimensions_fails_without_any_reward() -> None:
+    ok, reasons = evaluate_dimensions(["reward"], [])
+    assert not ok and reasons
+
+
+# Covers: R10
+def test_evaluate_cheat_hardcode_fails_loudly_without_script() -> None:
+    ok, reasons = evaluate_cheat("hardcode", {"reward": 0}, {}, ["f2p"], hardcode_script_present=False)
+    assert not ok
+    assert "hardcode.sh missing" in reasons[0]
+
+
+# --- docs/task-authoring.md must not drift from what `owl validate` enforces ------------------
+
+_ROOT = Path(__file__).resolve().parent.parent
+_AUTHORING_DOC = _ROOT / "docs" / "task-authoring.md"
+
+
+def _doc_list(name: str) -> set[str]:
+    """Backticked tokens inside `<!-- owl-doc:NAME --> ... <!-- /owl-doc:NAME -->` of the doc."""
+    text = _AUTHORING_DOC.read_text()
+    match = re.search(rf"<!-- owl-doc:{name} -->(.*?)<!-- /owl-doc:{name} -->", text, re.DOTALL)
+    assert match, f"docs/task-authoring.md lacks the owl-doc:{name} block"
+    return set(re.findall(r"`([^`]+)`", match.group(1)))
+
+
+# Covers: R2, R5, R6, R14
+def test_authoring_doc_prescriptions_match_validate_and_tasks() -> None:
+    assert CANARY_GUID in _AUTHORING_DOC.read_text()
+    assert _doc_list("suite_categories") == set(SUITE_CATEGORIES)
+    assert _doc_list("non_suite_types") == set(NON_SUITE_TYPES)
+    assert _doc_list("attacks") == set(CHEAT_ATTACKS)
+    assert _doc_list("canary_globs") == {"task.toml", *_CANARY_GLOBS}
+
+    builtin = re.search(r'_OWL_DIM_BUILTIN_KEYS="([^"]+)"', CANONICAL_LIB.read_text())
+    assert builtin, "lib.sh no longer declares _OWL_DIM_BUILTIN_KEYS"
+    assert _doc_list("builtin_dims") == set(builtin.group(1).split())
+
+    # The static check names the doc lists are the ones validate really reports.
+    smoke_checks = static_checks(_ROOT / "tasks" / "00-smoke")
+    assert _doc_list("static_checks") == set(smoke_checks)
+
+
+# Covers: R2, R6
+def test_authoring_doc_format_example_passes_static_checks(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The doc points at tasks/00-smoke as the format example: against the REAL canonical
+    library (the autouse fixture swaps it out) it must pass every static check."""
+    import owl.validate as validate_module
+
+    monkeypatch.setattr(validate_module, "CANONICAL_LIB", CANONICAL_LIB)
+    results = static_checks(_ROOT / "tasks" / "00-smoke")
+    assert all(ok for ok, _ in results.values()), results
+
+
+# Covers: R14
+def test_authoring_doc_does_not_leak_the_dev_catalog() -> None:
+    """The holdout author sees only this doc: no dev-task specifics may appear in it."""
+    text = _AUTHORING_DOC.read_text().lower()
+    forbidden = [
+        "severity", "pagination", "cursor", "timezone", "idor", "idempoten", "csv", "opsdesk",
+        "incident", "backup", "injected clock", "combined filter", "daily stat", "tasks/1", "tasks/2",
+    ]
+    assert [term for term in forbidden if term in text] == []

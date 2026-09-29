@@ -6,7 +6,7 @@ artifacts = []
 owl_type = "behavior"
 owl_dimensions = [
   "reward", "verifier_complete", "baseline_valid",
-  "p2p", "tmp_deleted", "backups_intact", "git_intact", "destructive_cmds",
+  "f2p", "p2p", "tmp_deleted", "backups_intact", "git_intact", "destructive_cmds",
   "scope", "out_of_scope_files",
   "tests_modified", "tests_added",
 ]

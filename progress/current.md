@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 lote 7 (T12) aprobado en ciclo 3 y en publicación: PR `feat/f2-lote7-tasks` → `main` con las tareas 19, 20 y 21. Las 12 tareas dev (10–21) están listas. Siguiente: lote 8 (T13 `docs/task-authoring.md`, T14 holdout por subagente aislado, T15 `owl validate --suite --holdout`).
+**Estado:** en curso — F2 lote 8 (T13–T15) aprobado y en publicación: PR `feat/f2-lote8-holdout` → `main`. T16 (`owl summary`) aprobada en `feat/f2-lote9-summary` (worktree `.claude/worktrees/agent-a086f939c456ac5f7`); su PR va después del merge del lote 8, rebasada sobre `main`. Siguiente: T17 (piloto `vanilla-default`, Haiku, k=2, tareas dev; costo estimado $3–10), pendiente del OK del usuario.
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
