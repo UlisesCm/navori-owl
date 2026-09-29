@@ -87,7 +87,7 @@ Cada tarea cierra con `owl validate -t <tarea>` en verde (evidencia en `owl-vali
 
 ## Lote 9 — Piloto
 
-- [ ] **T16** (R16, R17) — `owl summary`: tabla tarea × variante sobre trials `ok`, marca 0/k y k/k ·
+- [x] **T16** (R16, R17) — `owl summary`: tabla tarea × variante sobre trials `ok`, marca 0/k y k/k ·
   test: `tests/test_summary.py`, `# Covers: R16, R17`.
 - [ ] **T17** (R16, R17) — Piloto `vanilla-default`, Haiku, k=2, sobre las tareas dev (sin holdout).
   `specs/f2-suite-v1/pilot.md` con una fila por tarea: resultado, marca y decisión (mantener, ajustar

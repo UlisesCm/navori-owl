@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-29 19:45 orchestrator — F2 T16: owl summary
+- Cambios: owl/summary.py + `owl summary JOBS_DIR... [--json PATH] [--holdout]` (tabla tarea × variante sobre trials `ok` del gate: n_valid, éxitos, marca 0/k o k/k, costo y turnos promedio, dimensiones secundarias y trials excluidos por categoría), owl/gate.py (task_path por trial; reward.json que no es objeto cuenta como infra), owl/tasks.py (rechazo de holdout con exit 2 según D10, en run, validate y summary; falla cerrado si un trial no resuelve su tarea), design.md (contrato de `owl summary` y campo `excluded`), tests/test_summary.py, tests/test_tasks.py, README.
+- Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (116 passed tras rebasar sobre main; reviewer APPROVED en ciclo 2).
+- Notas: un trial ok sin reward numérico se excluye como infra y queda visible en la columna `excluded`, nunca cuenta como derrota. Hecha en un worktree en paralelo al lote 8 y rebasada después de su merge.
+- Commit / PR: branch feat/f2-lote9-summary
+
 ## 2026-09-29 19:10 orchestrator — F2 lote 8: contrato de autoría, holdout y validate endurecido
 - Cambios: docs/task-authoring.md (contrato autosuficiente para autores aislados, reglas de integridad genéricas, sin catálogo dev; listas marcadas que un test compara contra el código), owl/validate.py (checks required_files, metadata y dimensions; el ataque hardcode falla si falta cheat/hardcode.sh), holdout/30-*, 31-*, 32-* (escritos por autores aislados en contenedor: claude -p, Sonnet 5.5, solo patient/ + el contrato + lib.sh + 00-smoke), tasks/15 y 17 (test.sh ejecutable), tasks/20 (f2p en owl_dimensions), VISION.md (§7.1 no-root por integridad del baseline; §10 y §13 F6 "suites por perfil" como dirección futura), tests/test_validate.py.
 - Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (102 passed; reviewer APPROVED). T15: owl validate --suite --holdout en verde, 15/15 (jobs/validate-20260929-183418).

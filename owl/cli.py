@@ -2,6 +2,7 @@
 
     owl run -v vanilla-default -v superpowers -t tasks/00-smoke -k 1
     owl gate jobs/
+    owl summary jobs/pilot-f2 --json summary.json
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pathlib import Path
 
 from owl.gate import check_jobs, write_report
 from owl.patient import ensure_patient_image_for_tasks
+from owl.summary import cmd_summary
 from owl.tasks import resolve_task_args
 from owl.validate import cmd_validate
 from owl.variants import ROOT, Variant
@@ -191,6 +193,14 @@ def main() -> None:
     gate = sub.add_parser("gate", help="Check contamination and model reachability of trials.")
     gate.add_argument("jobs_dir", nargs="?", default="jobs")
     gate.set_defaults(func=cmd_gate)
+
+    summary = sub.add_parser(
+        "summary", help="Task x variant table over gate-ok trials; flags 0/k and k/k (pilot review)."
+    )
+    summary.add_argument("jobs_dir", nargs="+", help="One or more jobs dirs (each holds job dirs with owl-variant.json).")
+    summary.add_argument("--json", default=None, help="Also write the cells as JSON to this path.")
+    summary.add_argument("--holdout", action="store_true", help="Required to summarize any holdout task (R15).")
+    summary.set_defaults(func=cmd_summary)
 
     validate = sub.add_parser(
         "validate", help="Free checklist (oracle x5, nop, CheatAgent attacks): owl-validate.json, no model calls."

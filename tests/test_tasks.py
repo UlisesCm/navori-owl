@@ -99,12 +99,16 @@ def test_refuse_holdout_accepts_with_flag(tmp_path: Path) -> None:
 
 
 # Covers: R14, R15
-def test_resolve_task_args_rejects_holdout_task_without_flag(tmp_path: Path) -> None:
+def test_resolve_task_args_rejects_holdout_task_without_flag(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     holdout_root = tmp_path / "holdout"
     holdout_task = _write_task(holdout_root, "30-security-x")
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(SystemExit) as exc:
         resolve_task_args([str(holdout_task)], suite=False, holdout=False)
+    assert exc.value.code == 2
+    assert str(holdout_task.resolve()) in capsys.readouterr().err
 
 
 # Covers: R14, R15

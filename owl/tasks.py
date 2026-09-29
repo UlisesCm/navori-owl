@@ -6,9 +6,11 @@ Requirements covered: R4, R5, R14, R15.
 
 from __future__ import annotations
 
+import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NoReturn
 
 ROOT = Path(__file__).resolve().parent.parent
 TASKS_DIR = ROOT / "tasks"
@@ -131,9 +133,15 @@ def resolve_task_args(task: list[str] | None, suite: bool, holdout: bool) -> lis
 
     refused = refuse_holdout(task_paths, allowed=holdout)
     if refused:
-        names = ", ".join(str(t) for t in refused)
-        raise SystemExit(f"Refusing to run holdout task(s) without --holdout: {names}")
+        exit_refused("run", refused)
     return task_paths
+
+
+def exit_refused(verb: str, refused: list[Path] | list[str]) -> NoReturn:
+    """Reject the whole call (D10): list the refused holdout tasks on stderr and exit 2."""
+    names = ", ".join(str(t) for t in refused)
+    print(f"Refusing to {verb} holdout task(s) without --holdout: {names}", file=sys.stderr)
+    raise SystemExit(2)
 
 
 def suite_tasks(include_holdout: bool = False) -> list[Path]:
