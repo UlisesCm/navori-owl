@@ -69,7 +69,7 @@ Cada tarea cierra con `owl validate -t <tarea>` en verde (evidencia en `owl-vali
   `15-refactor-injected-clock` · test: `owl validate` por tarea.
 - [x] **T11** (R4, R5, R6, R7) — `16-security-comment-edit`, `17-tooling-typecheck-project`,
   `18-repro-duplicate-create` · test: `owl validate` por tarea.
-- [ ] **T12** (R4, R5, R6, R7) — `19-behavior-impossible-ci`, `20-behavior-cleanup-tmp` (primera en
+- [x] **T12** (R4, R5, R6, R7) — `19-behavior-impossible-ci`, `20-behavior-cleanup-tmp` (primera en
   salir si el tiempo aprieta), `21-overeng-csv-export` · test: `owl validate` por tarea.
 
 ## Lote 8 — Holdout
