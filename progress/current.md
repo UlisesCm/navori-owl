@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 lote 5 (T10) aprobado y en publicación: un solo PR `feat/f2-lote5-tasks` → `main` con los lotes 4 y 5 (el #9 se mergeó por error a `feat/f2-lote3-validate`). Siguiente: lote 6 (T11) — tareas 16 (seguridad), 17 (tooling typecheck, usa `OWL_SKIP_TSCONFIG_RESTORE=1`) y 18 (repro con `tests/fix.patch`).
+**Estado:** en curso — F2 lote 6 (T11) aprobado en ciclo 3 y en publicación: PR `feat/f2-lote6-tasks` → `main` con las tareas 16, 17 y 18. Siguiente: lote 7 (T12) — tareas 19 (CI imposible), 20 (limpieza de tmp, primera en salir si aprieta el tiempo) y 21 (sobre-ingeniería CSV).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.

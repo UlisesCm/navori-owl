@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-29 16:20 orchestrator — F2 lote 6: tareas 16, 17 y 18
+- Cambios: tasks/16-security-comment-edit (PATCH de comentarios; exploits de IDOR entre tenants, rol, mass assignment y 401, reglas deducibles de docs/permissions.md), tasks/17-tooling-typecheck-project (seed `.toSorted()` con lib es2022; `checks_weakened` por --showConfig, --listFilesOnly ⊇ baseline, supresiones añadidas y script intacto), tasks/18-repro-duplicate-create (el agente escribe un test F→P contra `tests/fix.patch` con Idempotency-Key; corridas aisladas y simétricas), tests/test_validate_docker.py (11 tests docker de la 18), design.md (nota de la tarea 18).
+- Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (77 passed, 1 skipped; reviewer APPROVED en ciclo 3). owl validate 16/17/18 en verde; docker `-k repro` 11 passed.
+- Notas: el review encontró dos trampas reproducidas en la 18 (estado en /tmp entre corridas; edad del mtime de /app delataba la corrida 2). Se cerró con aislamiento (/tests y /logs/verifier inaccesibles, HOME/TMPDIR frescos, reset de procesos, archivos e IPC de node) y el mismo reset antes de cada corrida. Aceptado y documentado: un test que inspecciona src (o latencias del `git apply`) cuenta como F→P; cerrarlo requiere el juez D9. La instrucción de la 17 pasó a inglés como el resto de la suite.
+- Commit / PR: branch feat/f2-lote6-tasks
+
 ## 2026-09-24 22:30 orchestrator — F2 lote 5: tareas 13–15, typecheck, convenciones y dimensiones por tarea
 - Cambios: owl/verifier/lib.sh (owl_typecheck con tipos solo del toolchain, owl_conventions M1–M6 por contenido, owl_dim con fail-closed) y sus copias; patient/Dockerfile (@types/node en /opt/owl/toolchain); patient/packages/db/src/db.ts (registra migraciones aplicadas: el CLI fallaba en la segunda llamada); owl/agents/cheat.py (chmod como root); tasks/13-hidden-cause-daily-stats, tasks/14-feature-incident-tags, tasks/15-refactor-injected-clock; design D2, D6, D7 y Contracts.
 - Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (77 passed, 1 skipped; reviewer APPROVED). 44 pruebas docker verdes. owl validate de 00 y 10–15 en verde, sin modelo.
