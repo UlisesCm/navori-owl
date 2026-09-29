@@ -38,6 +38,8 @@ class TrialGate:
     cost_usd: float | None = None
     num_turns: int | None = None
     reward: dict | None = None
+    # Task directory the trial ran (Harbor ``config.json`` ``task.path``); None if unreadable.
+    task_path: str | None = None
 
 
 def _fail(gate: TrialGate, reason: str, category: str) -> None:
@@ -163,14 +165,28 @@ def _overlay_cost_from_result_json(gate: TrialGate, trial_dir: Path) -> None:
         gate.cost_usd = agent_result["cost_usd"]
 
 
+def _task_path(trial_dir: Path) -> str | None:
+    """Task directory from the trial's Harbor ``config.json``; None if missing or malformed."""
+    try:
+        path = json.loads((trial_dir / "config.json").read_text()).get("task", {}).get("path")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return None
+    return path if isinstance(path, str) else None
+
+
 def check_trial(trial_dir: Path, variant: dict) -> TrialGate:
     gate = TrialGate(trial=trial_dir.name, variant=variant["id"], passed=True)
     reward_file = trial_dir / "verifier" / "reward.json"
     if reward_file.is_file():
         try:
-            gate.reward = json.loads(reward_file.read_text())
+            reward = json.loads(reward_file.read_text())
         except json.JSONDecodeError:
+            reward = None
+        if isinstance(reward, dict):
+            gate.reward = reward
+        else:
             _fail(gate, "invalid reward.json", "infra")
+    gate.task_path = _task_path(trial_dir)
 
     agent = variant.get("agent", "claude-code")
     check = _AGENT_CHECKS.get(agent)

@@ -60,6 +60,7 @@ agente puede leer, variantes que "ganan" solo porque gastaron más.
 owl run -v vanilla-default -v superpowers -t tasks/00-smoke -k 1
 owl run -v codex-default -t tasks/00-smoke -k 1
 owl gate jobs/
+owl summary jobs/pilot-f2 --json summary.json   # tarea x variante sobre trials ok; marca 0/k y k/k
 ```
 
 `--auth oauth` (default) usa tu suscripción activa (login de Claude Code o del plan de ChatGPT, según

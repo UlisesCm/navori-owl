@@ -706,8 +706,10 @@ Más `[agent] user = "node"`. `[verifier] user` queda sin declarar (root).
 **CLI:**
 - `owl run`: se agregan `--suite` y `--holdout`.
 - `owl validate` (D9).
-- `owl summary JOBS_DIR [--json]` escribe `owl-summary.json` con `[{task, variant, n_valid, successes,
-  flag, mean_cost_usd, mean_turns, dims}]`.
+- `owl summary JOBS_DIR... [--json PATH] [--holdout]` escribe en `PATH` (si se pasa) `[{task, variant,
+  n_valid, successes, flag, mean_cost_usd, mean_turns, dims, excluded}]`, con `excluded` = `{categoría: n}`
+  de los trials fuera de `ok`. Sin `--holdout` rechaza (exit 2) si algún trial es holdout o su tarea no se
+  puede resolver (`config.json` ilegible): falla cerrado (R15).
 
 **`owl-validate.json`:**
 ```
