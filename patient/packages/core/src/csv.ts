@@ -1,6 +1,5 @@
 /** RFC 4180 quoting: a field is quoted only if it contains a comma, quote or line break; an
- * embedded quote is escaped by doubling it. Reused by the CLI's `--format csv` (task 21) instead
- * of a hand-rolled `join(",")`. */
+ * embedded quote is escaped by doubling it. Rows are joined with CRLF. */
 export type CsvValue = string | number | boolean | null | undefined;
 
 function quoteField(value: CsvValue): string {

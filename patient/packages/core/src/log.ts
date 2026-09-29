@@ -7,7 +7,7 @@ export interface LogFields {
 
 // M5: the log record's own timestamp goes through Clock too, like every other new src/ read of
 // the current time — a module-level SystemClock (never test-injected; log lines aren't asserted
-// on by any task) rather than a per-call Clock parameter, since that would force every caller of
+// on by tests) rather than a per-call Clock parameter, since that would force every caller of
 // log.event/log.error across every package to thread one through just for a log line.
 const clock = new SystemClock();
 
