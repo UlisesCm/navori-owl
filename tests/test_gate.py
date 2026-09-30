@@ -365,6 +365,30 @@ def test_result_event_flag(tmp_path: Path) -> None:
     assert check_trial(no_result, VARIANT).result_event is False
 
 
+def test_multi_result_turns_are_summed(tmp_path: Path) -> None:
+    """Covers: R29 (mean turns): every result event of a delegating run counts, cost stays the last one."""
+    results = [_result(num_turns=n, total_cost_usd=0.4) for n in (7, 4, 5, 3, 4, 3)]
+    gate = check_trial(_trial(tmp_path, [INIT, *results]), VARIANT)
+    assert gate.num_turns == 26
+    assert gate.cost_usd == 0.4
+
+
+def test_single_result_turns_unchanged(tmp_path: Path) -> None:
+    """Covers: R29"""
+    gate = check_trial(_trial(tmp_path, [INIT, _result(num_turns=9)]), VARIANT)
+    assert gate.num_turns == 9
+
+
+def test_real_navori_smoke_turns_are_summed() -> None:
+    """Covers: R29 (real 6-result navori trial; jobs/ is git-ignored, so skipped when absent)."""
+    root = Path(__file__).resolve().parent.parent / "jobs" / "smoke-f3" / "main-v2"
+    trials = sorted(root.glob("*navori*/02-smoke-patient__*/agent/claude-code.txt"))
+    if not trials:
+        pytest.skip("real navori smoke trial not present")
+    gate = check_trial(trials[0].parent.parent, VARIANT)
+    assert gate.num_turns == 26
+
+
 def test_round_conformance_flags_mismatched_max_turns_and_budget(tmp_path: Path) -> None:
     """Covers: R11, R13, R20"""
     trial = _round_trial(tmp_path, "fix it\n\nWork unattended.\n", max_turns=2, max_budget_usd="1.00")
