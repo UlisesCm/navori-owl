@@ -14,8 +14,27 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 VARIANTS_DIR = ROOT / "variants"
 CACHE_DIR = ROOT / ".owl-cache"
+PATIENT_DIR = ROOT / "patient"
 
 _FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _check_artifact_prefix(variant_id: str, prefix: str) -> None:
+    """R8: an artifact prefix ends in `/`, lies outside `packages/` and covers no patient file.
+
+    The last rule keeps the exemption from ever hiding an edit to the patient's code or docs.
+    """
+    problem = None
+    if not prefix.endswith("/"):
+        problem = "does not end in '/'"
+    elif prefix.startswith("packages/"):
+        problem = "is under packages/"
+    else:
+        under = PATIENT_DIR / prefix
+        if under.is_file() or (under.is_dir() and any(p.is_file() for p in under.rglob("*"))):
+            problem = "contains a file of patient/"
+    if problem:
+        raise SystemExit(f"Variant '{variant_id}': artifacts prefix '{prefix}' {problem}.")
 
 
 @dataclass
@@ -36,6 +55,8 @@ class Variant:
     bare: bool = False
     runtime_state: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
+    append_system_prompt: str | None = None
+    artifacts: list[str] = field(default_factory=list)
     expect: dict[str, list[str]] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -54,6 +75,10 @@ class Variant:
                     f"Variant '{variant_id}', plugin '{plugin.name}': ref '{plugin.ref}' is not "
                     f"a full 40-char lowercase hex commit SHA. Pin plugins to a commit, not a branch/tag."
                 )
+        artifacts = [str(p) for p in (harness.get("artifacts") or [])]
+        for prefix in artifacts:
+            _check_artifact_prefix(variant_id, prefix)
+        append_prompt = harness.get("append_system_prompt")
         return cls(
             id=data["id"],
             description=data.get("description", ""),
@@ -64,6 +89,8 @@ class Variant:
             bare=bool(harness.get("bare", False)),
             runtime_state=[str(p) for p in (harness.get("runtime_state") or [])],
             env={k: str(v) for k, v in (harness.get("env") or {}).items()},
+            append_system_prompt=str(append_prompt) if append_prompt is not None else None,
+            artifacts=artifacts,
             expect={k: list(v or []) for k, v in (data.get("expect") or {}).items()},
             raw=data,
         )
