@@ -170,7 +170,7 @@ Receta, respaldada por la doc oficial de Claude Code y por lo que ya hacen Harbo
 2. **`HOME` y `CLAUDE_CONFIG_DIR` vacíos por trial.** Así se evita la contaminación desde `~/.claude`, `~/.engram`, `~/.navori` y los plugins del usuario.
 3. **Fixture idéntico para todas las variantes:** commit único, sin remotes, tags ni reflog. Así se cierra la fuga por historial de git (SWE-bench #465).
 4. **Tests y oráculo fuera del sandbox** durante la corrida; se montan solo al verificar.
-5. **Sin red externa,** salvo la API del modelo y lo que declare el manifiesto.
+5. **Red declarada e idéntica para todas las variantes.** La ronda 1 usa red pública, declarada en `RULES.md` (F3 D16: sin lista de permitidos); lo que una variante necesite de la red lo declara su manifiesto.
 6. **Auditar la imagen:** que no haya un `/etc/claude-code/managed-settings.json`, porque tiene la precedencia más alta.
 7. **No confiar en `--setting-sources`** para aislar (issue abierto #87590).
 8. **Memorias persistentes** (engram, claude-mem): se resetean por trial. Si se quiere medir la memoria, se hace con tareas multi-sesión diseñadas para eso.
