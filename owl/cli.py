@@ -18,6 +18,7 @@ from pathlib import Path
 
 from owl.gate import check_jobs, write_report
 from owl.patient import ensure_patient_image_for_tasks
+from owl.round import Round
 from owl.summary import cmd_summary
 from owl.tasks import resolve_task_args
 from owl.validate import cmd_validate
@@ -34,7 +35,27 @@ DEFAULT_MODELS = {
 ENV_FILE = ROOT / ".env"
 
 
-def _harbor_command(variant: Variant, task: Path, job_name: str, jobs_dir: Path, model: str) -> list[str]:
+def _round_flags(round_def: Round) -> list[str]:
+    """Harbor flags that are identical for every variant of a round (R10, R11)."""
+    raw = round_def.raw
+    flags = ["--extra-instruction-path", str(round_def.dir / "preamble.md")]
+    for flag, key in (
+        ("--agent-timeout-multiplier", "agent_timeout_multiplier"),
+        ("--agent-setup-timeout-multiplier", "agent_setup_timeout_multiplier"),
+    ):
+        if key in raw:
+            flags += [flag, str(raw[key])]
+    if "max_turns" in raw:
+        flags += ["--ak", f"max_turns={int(raw['max_turns'])}"]
+    if "max_budget_usd" in raw:
+        # Harbor types max_budget_usd as str and --ak goes through json.loads: pass a JSON string.
+        flags += ["--ak", f"max_budget_usd={json.dumps(str(raw['max_budget_usd']))}"]
+    return flags
+
+
+def _harbor_command(
+    variant: Variant, task: Path, job_name: str, jobs_dir: Path, model: str, round_def: Round | None = None
+) -> list[str]:
     if variant.agent not in AGENT_IMPORT_PATHS:
         raise SystemExit(f"Variant {variant.id}: agent '{variant.agent}' not supported yet (F5).")
     if variant.agent == "codex" and (variant.plugins or variant.init or variant.bare or variant.runtime_state):
@@ -51,6 +72,8 @@ def _harbor_command(variant: Variant, task: Path, job_name: str, jobs_dir: Path,
         # Harbor's built-in codex agent rejects unknown kwargs. Variant identity is already
         # recorded in owl-variant.json regardless, so it's fine to drop for other agents.
         cmd += ["--ak", f"variant_id={variant.id}"]
+    if round_def is not None:
+        cmd += _round_flags(round_def)
     if variant.agent_version:
         cmd += ["--ak", f"version={variant.agent_version}"]
     if variant.agent == "claude-code":
@@ -63,6 +86,10 @@ def _harbor_command(variant: Variant, task: Path, job_name: str, jobs_dir: Path,
             cmd += ["--ak", "bare=true"]
         if variant.runtime_state:
             cmd += ["--ak", "runtime_state=" + ",".join(variant.runtime_state)]
+        if variant.append_system_prompt is not None:
+            cmd += ["--ak", f"append_system_prompt={variant.append_system_prompt}"]
+        if round_def is not None and round_def.artifacts:
+            cmd += ["--ak", "artifacts=" + ",".join(round_def.artifacts)]
     for key, value in variant.env.items():
         cmd += ["--ae", f"{key}={value}"]
     if ENV_FILE.is_file():

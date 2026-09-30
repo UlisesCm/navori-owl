@@ -1,0 +1,111 @@
+# gentle-ai v3.7.0 installed by its own binary, pinned by release and sha256, with the product defaults.
+#
+# DISCLOSURE (RULES.md / report, D17):
+# - Route: release tarball from github.com/Gentleman-Programming/gentle-ai (v3.7.0), verified with a
+#   sha256 pinned in this file (taken from the release's checksums.txt, spike T11 §1) and extracted
+#   to $HOME/.local/bin (Harbor puts it on PATH). The minisign signature is not verified (it would
+#   need `minisign` in the image).
+# - Command, from /app: `gentle-ai install --agent claude-code --preset full-gentleman --scope
+#   workspace`. No --persona / --sdd-mode: product defaults, i.e. persona `gentleman`, SDD mode
+#   `single` (store `openspec`), receipt-driven development `on` (spike T11 §10). The `gentleman`
+#   persona tells the agent to use bat/rg/fd/sd/eza, which the image does not have; it is measured
+#   as shipped.
+# - Telemetry: OFF. `GENTLE_AI_TELEMETRY=0` is exported in `init` (install-time telemetry) and set in
+#   `harness.env` (the Stop/SubagentStop hooks would otherwise report model and tokens each session).
+#   Verified in the spike: status `disabled (source: GENTLE_AI_TELEMETRY)`, hooks answer "disabled".
+# - Where it writes (spike T11 §4-§5): the project side (/app/.claude/**, /app/.mcp.json with context7)
+#   stays as installed. State and tools in $HOME (~/.gentle-ai, ~/.config/gga, ~/.local/share/gga,
+#   ~/.engram, ~/.local/bin/{gga,engram}) stay in $HOME. Themes (~/.claude/themes) are not bridged.
+#   Only the `permissions.deny` rules that gentle-ai writes to ~/.claude/settings.json are bridged
+#   (bridge B) into $OWL_CLAUDE_CONFIG_DIR/settings.json, because Harbor runs Claude Code with
+#   CLAUDE_CONFIG_DIR=/logs/agent/sessions and would not load ~/.claude*.
+# - engram: NOT pinned. The installer downloads engram from `releases/latest` (2.2.1 observed on
+#   2026-09-30) unless one is already in PATH; which engram version v3.7.0 expects, and whether
+#   2.1.0 supports `--protocol=slim`, was not established (spike §9). The version can therefore
+#   change between rounds; report the version seen in the trial.
+# - TO CONFIRM IN T21 (the spike had no real `claude`, only a stub): what `claude plugin install
+#   engram` and `claude mcp add --scope user engram` write, and whether that lands under
+#   CLAUDE_CONFIG_DIR (exported below to $OWL_CLAUDE_CONFIG_DIR). If it lands in ~/.claude* the
+#   bridge must also cover ~/.claude.json mcpServers and ~/.claude/plugins/. The `expect` block below
+#   is likewise provisional: .mcp.json only declares context7; whether engram appears as a loaded
+#   MCP server or plugin in `system/init` is confirmed in T21.
+# - TO CONFIRM IN T21: the real Harbor mount of /logs/agent (the spike emulated it), and the
+#   review stop-hook's effect on headless sessions (D3, "Riesgo declarado").
+id: gentle-ai
+description: gentle-ai v3.7.0 instalado desde su release pineado (claude-code, preset full-gentleman, scope workspace) con telemetría apagada.
+agent: claude-code
+agent_version: "2.1.281"
+harness:
+  init: |
+    set -eu
+    GENTLE_AI_VERSION="3.7.0"
+    case "$(uname -m)" in
+      x86_64)
+        GENTLE_AI_ARCH=amd64
+        GENTLE_AI_SHA256="a730a61a43758f04cc9a4ac644945cc0e8652a1e33d6997a0a3d3f0044d2fff5" ;;
+      aarch64|arm64)
+        GENTLE_AI_ARCH=arm64
+        GENTLE_AI_SHA256="a3a3d3a974f3d9b67d935fe9e306ae83c305da4ec1baed4a5319c10b044cd0eb" ;;
+      *) echo "gentle-ai: unsupported arch $(uname -m)" >&2; exit 1 ;;
+    esac
+    GENTLE_AI_TARBALL="gentle-ai_${GENTLE_AI_VERSION}_linux_${GENTLE_AI_ARCH}.tar.gz"
+    GENTLE_AI_URL="https://github.com/Gentleman-Programming/gentle-ai/releases/download/v${GENTLE_AI_VERSION}/${GENTLE_AI_TARBALL}"
+    GENTLE_AI_TMP="$(mktemp -d)"
+    curl -fsSL -o "$GENTLE_AI_TMP/$GENTLE_AI_TARBALL" "$GENTLE_AI_URL"
+    echo "$GENTLE_AI_SHA256  $GENTLE_AI_TARBALL" > "$GENTLE_AI_TMP/checksum.txt"
+    (cd "$GENTLE_AI_TMP" && sha256sum -c checksum.txt)
+    mkdir -p "$HOME/.local/bin"
+    tar -xzf "$GENTLE_AI_TMP/$GENTLE_AI_TARBALL" -C "$GENTLE_AI_TMP" gentle-ai
+    install -m 0755 "$GENTLE_AI_TMP/gentle-ai" "$HOME/.local/bin/gentle-ai"
+    rm -rf -- "$GENTLE_AI_TMP"
+    export PATH="$HOME/.local/bin:$PATH"
+    export GENTLE_AI_TELEMETRY=0
+    # Claude Code config the installer writes through `claude` lands in the trial's config dir.
+    : "${OWL_CLAUDE_CONFIG_DIR:?OWL_CLAUDE_CONFIG_DIR is not set}"
+    mkdir -p "$OWL_CLAUDE_CONFIG_DIR"
+    export CLAUDE_CONFIG_DIR="$OWL_CLAUDE_CONFIG_DIR"
+    cd /app
+    gentle-ai install --agent claude-code --preset full-gentleman --scope workspace
+    # Bridge B (spike T11 §5): merge the permissions.deny rules gentle-ai writes to
+    # ~/.claude/settings.json into the trial's settings.json.
+    if [ -f "$HOME/.claude/settings.json" ]; then
+      node -e '
+        const fs = require("fs");
+        const [src, dst] = process.argv.slice(1);
+        const read = (p) => (fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf8")) : {});
+        const s = read(src), d = read(dst);
+        const deny = [...new Set([...(d.permissions?.deny ?? []), ...(s.permissions?.deny ?? [])])];
+        d.permissions = { ...(d.permissions ?? {}), deny };
+        fs.writeFileSync(dst, JSON.stringify(d, null, 2) + "\n");
+      ' "$HOME/.claude/settings.json" "$OWL_CLAUDE_CONFIG_DIR/settings.json"
+    fi
+    # Sentinel (D3): fail the setup loudly (exit 1) if the installed harness is not what the
+    # spike observed, instead of running the trial without it.
+    grep -q '"context7"' /app/.mcp.json || { echo "gentle-ai: context7 missing from .mcp.json" >&2; exit 1; }
+    grep -q 'gentle-ai review stop-hook' /app/.claude/settings.json || { echo "gentle-ai: review stop-hook missing from .claude/settings.json" >&2; exit 1; }
+    test -f /app/.claude/CLAUDE.md || { echo "gentle-ai: .claude/CLAUDE.md missing" >&2; exit 1; }
+    test -d /app/.claude/agents || { echo "gentle-ai: .claude/agents missing" >&2; exit 1; }
+    test -d /app/.claude/skills || { echo "gentle-ai: .claude/skills missing" >&2; exit 1; }
+    grep -q '"deny"' "$OWL_CLAUDE_CONFIG_DIR/settings.json" || { echo "gentle-ai: deny rules not bridged to $OWL_CLAUDE_CONFIG_DIR" >&2; exit 1; }
+    grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/CLAUDE.md || { echo "gentle-ai: base CLAUDE.md content missing after install" >&2; exit 1; }
+    grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/AGENTS.md || { echo "gentle-ai: base AGENTS.md content missing after install" >&2; exit 1; }
+  env:
+    GENTLE_AI_TELEMETRY: "0"
+  # source: gentle-ai v3.7.0 internal/components/agentguidance/routing.go:49,97 and
+  # .claude/CLAUDE.md (persona/orchestrator contract) order `odd/tasks/<feature-name>.md` before
+  # the first write (docs/usage.md; spike T11 §12); nothing else under odd/ is written (T14).
+  # source: gentle-ai v3.7.0 SDD skills (.claude/skills/sdd-*/SKILL.md) write `openspec/config.yaml`,
+  # `openspec/changes/<change>/...` and `openspec/specs/...`; the default store is `openspec`
+  # (`gentle-ai sdd-status`, spike T11 §12). openspec/ is the narrowest prefix covering
+  # config.yaml, changes/ and specs/ (T14).
+  artifacts:
+    - "odd/tasks/"
+    - "openspec/"
+  # .atl/ is written by the harness itself (UserPromptSubmit hook `skill-registry refresh`), not
+  # agent output (spike T11 §4, §12).
+  runtime_state:
+    - ".atl/"
+# Provisional, see "TO CONFIRM IN T21": .mcp.json only declares context7.
+expect:
+  plugins: []
+  mcp_servers: [context7]

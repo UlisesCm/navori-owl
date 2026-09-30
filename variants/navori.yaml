@@ -141,9 +141,9 @@ harness:
     # line every patient revision carries right after the intro paragraph.
     grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/CLAUDE.md || { echo "navori: base CLAUDE.md content missing after init+render" >&2; exit 1; }
     grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/AGENTS.md || { echo "navori: base AGENTS.md content missing after init+render" >&2; exit 1; }
-  # source: navori@0.10.0 subagent-handoff/orchestrator hooks write session progress
-  # notes under .claude/progress/ (plans and handoffs): agent-facing artifacts, not
-  # state the harness writes by itself.
+  # source: navori@0.10.0 agents write plans and handoff notes under .claude/progress/
+  # (auditor.md:75, implementer.md:81, orchestrator.md:110-122); the hooks only read them
+  # (subagent-stop-handoff.sh:420-431). Agent-facing artifacts, not harness-written state.
   artifacts:
     - ".claude/progress/"
   runtime_state:
