@@ -511,7 +511,10 @@ rutas que `tests_*`, `lib.sh:313-333`) presentes en el baseline (`-` en el resto
   o su primer token es `test`, `it`, `describe` o `suite` seguido de `(` o `.`. El paciente usa `node:test`
   con `test(` (24 líneas) y `assert.*` (46) en `patient/packages/*/test/*.ts`. Cuentan: cambiar `test(` por
   `test.skip(`, invertir o borrar un `assert`, renombrar un test. No cuentan: extender un `import`, tocar un
-  helper o una línea de datos, agregar casos.
+  helper o una línea de datos, agregar casos. **Excepción implementada en T6:** las líneas que empiezan con
+  `import` y la cola `} from …` de un import multilínea no cuentan aunque contengan `assert` (el paciente
+  usa `import assert from "node:assert/strict"`); sin ella, extender ese import contaría como chequeo
+  quitado, contra lo que esta misma regla exige. No cambia la medición del piloto.
 - `reward.json` no cambia: el chequeo `owl_dimensions == claves de reward.json` (`owl/validate.py:199-212`)
   y los `task.toml` (holdout incluido) no se tocan.
 - **Copias (decisión 8):** `cp owl/verifier/lib.sh` a cada `tasks/*/tests/owl-lib.sh` en T6 y a cada
