@@ -103,14 +103,14 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
 
 ## Lote 2 — Condiciones uniformes, gate y costo
 
-- [ ] **T7** (R8, R10, R11) — `owl/cli.py::_harbor_command` en modo ronda: `--extra-instruction-path` al
+- [x] **T7** (R8, R10, R11) — `owl/cli.py::_harbor_command` en modo ronda: `--extra-instruction-path` al
   `preamble.md`, `--agent-timeout-multiplier`, `--agent-setup-timeout-multiplier`, `--ak max_turns=`,
   `--ak 'max_budget_usd="…"'` (string JSON), `--ak artifacts=<unión>` en toda variante y
   `--ak append_system_prompt=` cuando la variante lo declara · test:
   `tests/test_cli_round.py::test_round_flags_identical_across_variants` (las 6; solo difiere lo propio de
   cada manifiesto), `::test_max_budget_is_json_string`, `::test_artifacts_union_passed_to_every_variant`,
   con `# Covers: R8, R10, R11`.
-- [ ] **T8** (R13, R17, R20, R21) — `owl/gate.py::check_trial` con la tabla de D10: clasificación de
+- [x] **T8** (R13, R17, R20, R21) — `owl/gate.py::check_trial` con la tabla de D10: clasificación de
   `exception_type` y del texto de `result` con error por `BaseInstalledAgent.ERROR_PATTERNS` de Harbor más
   el patrón de suscripción de owl; `rate_limit_event` con `status == "rejected"` y `api_error_status == 429`
   → `infra_reason = usage_limit`; `allowed_warning` → `rate_limit_warnings += 1`, sin cambiar la categoría;
@@ -124,8 +124,11 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   `::test_rate_limit_allowed_warning_counted_not_excluded`, `::test_429_is_usage_limit`,
   `::test_usage_limit_text_is_usage_limit`, `::test_5xx_is_infra`, `::test_nonzero_exit_is_agent_exit`,
   `::test_round_conformance_mismatch_is_contamination`, `::test_preamble_missing_is_contamination`), con
-  `# Covers: R13, R17, R20, R21`.
-- [ ] **T9** (R25) — Costo en el gate (D10): `total_cost_usd` del `result` (`reported`); si no, estimación
+  `# Covers: R13, R17, R20, R21`. `check_trial` acepta `round_def` opcional; T16 debe pasarlo desde
+  `check_jobs` (sin él no hay conformidad, estimador ni `stall_minutes` de la ronda). Los subtipos
+  `error_max_turns` y `error_max_budget_usd` son supuestos: T21 los confirma (un subtipo distinto caería a
+  `api_error`).
+- [x] **T9** (R25) — Costo en el gate (D10): `total_cost_usd` del `result` (`reported`); si no, estimación
   de owl desde `agent/sessions/projects/**/*.jsonl` (principal y subagentes): registros `assistant`
   agrupados por `message.id`, `usage` del último de cada id, precios de `round.yaml` con escritura de caché
   a 5 min y 1 h (`owl_estimate`); `_overlay_cost_from_result_json` deja de aplicarse a `claude-code`;
@@ -134,7 +137,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   creciente; valor a mano), `::test_owl_estimate_splits_cache_write_5m_1h`,
   `::test_owl_estimate_includes_subagent_files`, `::test_harbor_cost_ignored_for_claude_code`,
   `::test_harbor_cost_kept_for_codex`, con `# Covers: R25`.
-- [ ] **T10** (R25) — Validación del estimador contra el piloto (re-check NEW-3), gratis: correr el
+- [x] **T10** (R25) — Validación del estimador contra el piloto (re-check NEW-3), gratis: correr el
   estimador de T9 sobre los 24 trials de `jobs/pilot-f2` (solo vanilla, dev) con los precios de
   `round.yaml` y compararlo con el `total_cost_usd` de cada `result`. Resultado:
   `specs/f3-ronda1/cost-validation.md` (comando, tabla de 24 filas: reportado, estimado, error relativo) ·

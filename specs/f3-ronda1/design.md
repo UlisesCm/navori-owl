@@ -367,7 +367,7 @@ sola fuente) y se aplica igual al `exception_type` de `result.json` que al texto
   `trajectory.json`); con `result`, devuelve el mismo `total_cost_usd` del stream (`:1560`). Por eso
   `_overlay_cost_from_result_json` (`owl/gate.py:151-165`, llamado en `:198`) deja de aplicarse a
   `claude-code`; sigue para `codex`.
-- `cost_source ∈ {reported, owl_estimate}`, contado por variante. Un trial conservado sin ninguno se lista
+- `cost_source ∈ {reported, owl_estimate}` (más `harbor` para codex, que la ronda 1 no usa), contado por variante. Un trial conservado sin ninguno se lista
   como costo faltante (no se espera: si el agente corrió, hay sesión). La llamada en vuelo de un trial
   cortado no llega a la sesión: la estimación es una cota inferior leve, declarada.
 - El `cost-state` del transcript de sesión no sirve: se escribe solo al final.
@@ -781,7 +781,7 @@ max_turns=300 --ak 'max_budget_usd="5.00"' --ak artifacts=<unión>`, más `--ak 
 `placebo`.
 
 **`TrialGate`:** campos nuevos `limit_hit`, `exception_type`, `infra_reason`, `cost_source`
-(`reported` | `owl_estimate`), `rate_limit_warnings`.
+(`reported` | `owl_estimate`; `harbor` solo para agentes que no son `claude-code`, fuera de la ronda 1), `rate_limit_warnings`.
 
 **`report.json`:** `{round, conformance, counts, per_task: [Cell], primary: [{variant, endpoint, estimate,
 interval | null, arm_counts | null, p_raw, p_holm, differs, success: {estimate, interval}}], success: […],
