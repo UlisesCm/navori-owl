@@ -209,6 +209,7 @@ owl_changes() {
   OWL_SCOPE=0
   OWL_TESTS_MODIFIED=-1
   OWL_TESTS_ADDED=-1
+  OWL_CHANGES_TSV=""
   [ "$OWL_BASELINE_VALID" = "1" ] || return 0
 
   local baseline_manifest=/var/lib/owl/baseline.manifest
@@ -331,6 +332,59 @@ CHANGED
   done <<CHANGED2
 $changed
 CHANGED2
+
+  # changes.tsv rows (R32, D13): path, kind against the baseline snapshot, and — only for
+  # test files (same convention as above) that exist in the baseline — added / removed /
+  # removed-check line counts by content (_owl_test_line_counts). "-" everywhere else. A
+  # side signal for the analysis only: reward.json is untouched.
+  local kind counts
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if [ -z "${base_map["/app/$rel"]+x}" ]; then
+      kind=added
+    elif [ -z "${cur_map["/app/$rel"]+x}" ]; then
+      kind=deleted
+    else
+      kind=modified
+    fi
+    counts="-"$'\t'"-"$'\t'"-"
+    if [ "$kind" != added ]; then
+      case "$rel" in
+        test/*|*/test/*|tests/*|*/tests/*|*.test.*|*.spec.*)
+          counts=$(_owl_test_line_counts "$rel") ;;
+      esac
+    fi
+    OWL_CHANGES_TSV="$OWL_CHANGES_TSV$rel"$'\t'"$kind"$'\t'"$counts"$'\n'
+  done <<CHANGED3
+$changed
+CHANGED3
+}
+
+# Check-line pattern (D13, pre-registered in RULES.md): a line counts as a check when it
+# contains `assert` or `expect(`, or its first token is test|it|describe|suite followed by
+# `(` or `.`. Lines that only import/re-export bindings (an `import ...` line or the
+# `} from "..."` tail of a multi-line one) are never check lines even though they may
+# name `assert`: extending an import is not weakening a test.
+_OWL_CHECK_LINE_RE='assert|expect\(|^[[:space:]]*(test|it|describe|suite)[(.]'
+_OWL_IMPORT_LINE_RE='^[[:space:]]*(import([[:space:]{*]|$)|\}[[:space:]]*from[[:space:]])'
+
+# _owl_test_line_counts REL_PATH: prints "added<TAB>removed<TAB>check_removed" for a test file
+# present in the baseline, by CONTENT (diff against the baseline blob, never `git diff` on the
+# worktree — same reason as _owl_added_lines). A deleted file (or one replaced by a symlink or
+# non-regular entry, which is never read: a FIFO would block diff) diffs against empty, so all
+# of its baseline lines count as removed; unlike _owl_added_lines this does not yield nothing.
+_owl_test_line_counts() {
+  local rel="$1" base_tmp cur d added removed check
+  base_tmp=$(mktemp)
+  _owl_git cat-file -p "$OWL_BASELINE:$rel" > "$base_tmp" 2>/dev/null || : > "$base_tmp"
+  cur="/app/$rel"
+  { [ -f "$cur" ] && [ ! -L "$cur" ]; } || cur=/dev/null
+  d=$(diff "$base_tmp" "$cur" 2>/dev/null || true)
+  rm -f "$base_tmp"
+  added=$(printf '%s\n' "$d" | grep -c '^> ' || true)
+  removed=$(printf '%s\n' "$d" | grep -c '^< ' || true)
+  check=$(printf '%s\n' "$d" | sed -n 's/^< //p' | grep -Ev "$_OWL_IMPORT_LINE_RE" | grep -Ec "$_OWL_CHECK_LINE_RE" || true)
+  printf '%s\t%s\t%s' "$added" "$removed" "$check"
 }
 
 # owl_restore_pristine: overwrites every visible test file (by the same test/tests/
@@ -743,6 +797,7 @@ owl_finish() {
 
   printf '%s' "${OWL_CHANGED:-}" > /logs/verifier/changed-files.txt
   printf '%s' "${OWL_RUNTIME_STATE_FILES:-}" > /logs/verifier/runtime-state-files.txt
+  printf '%s' "${OWL_CHANGES_TSV:-}" > /logs/verifier/changes.tsv
 
   local extra=""
   [ -n "${OWL_TYPECHECK+x}" ] && extra="$extra, \"typecheck\": ${OWL_TYPECHECK}"

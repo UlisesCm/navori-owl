@@ -51,6 +51,15 @@ class ClaudeCodeHarnessOptions(ClaudeCodeOptions):
             "a path (.gitignore, .git/info/exclude) the agent could edit back out."
         ),
     )
+    artifacts: str | None = Field(
+        default=None,
+        description=(
+            "Comma-separated path prefixes (relative to /app, ending in '/') that variants "
+            "of the round write as documented output (plans, notes). owl passes the union "
+            "to every variant; appended, as root, to /var/lib/owl/ignore next to "
+            "runtime_state so those files never count as changed (D13)."
+        ),
+    )
 
 
 #: CANONICAL ALGORITHM — must stay byte-identical (as shell text) to
@@ -109,6 +118,10 @@ class ClaudeCodeHarness(ClaudeCode):
         raw = self.options.runtime_state or ""
         return [p for p in raw.split(",") if p.strip()]
 
+    def _artifact_prefixes(self) -> list[str]:
+        raw = self.options.artifacts or ""
+        return [p for p in raw.split(",") if p.strip()]
+
     def build_cli_flags(self) -> str:
         flags = [super().build_cli_flags()]
         if self.options.bare:
@@ -117,19 +130,31 @@ class ClaudeCodeHarness(ClaudeCode):
             flags.append(f"--plugin-dir {shlex.quote(self._remote_plugin_dir(source).as_posix())}")
         return " ".join(f for f in flags if f)
 
-    async def run(
-        self, instruction: str, environment: BaseEnvironment, context: AgentContext
-    ) -> None:
+    async def install(self, environment: BaseEnvironment) -> None:
+        """Install Claude Code, then the variant's harness — always (D6, R12).
+
+        ``ClaudeCode.install`` returns early when Claude Code is already at the requested
+        version; that only skips the CLI install, so the harness steps below do not depend
+        on it. They run in the agent setup phase, before the agent timeout starts.
+        """
+        await super().install(environment)
+
         for source in self._plugin_sources():
             if not (source / ".claude-plugin").is_dir():
                 raise ValueError(f"Not a Claude Code plugin (no .claude-plugin/): {source}")
             await environment.upload_dir(source, self._remote_plugin_dir(source).as_posix())
 
         if self.options.init_command:
+            # Same value Harbor's run() sets for CLAUDE_CONFIG_DIR (D6), so an init that
+            # bridges config into Claude's per-trial directory (D3) writes where it is read.
+            init_env = {
+                **self._resolve_auth_env(),
+                "OWL_CLAUDE_CONFIG_DIR": (self.environment_logs_dir / "sessions").as_posix(),
+            }
             await self.exec_as_agent(
                 environment,
                 command=f"cd /app && {self.options.init_command}",
-                env=self._resolve_auth_env(),
+                env=init_env,
             )
             # Baseline the diff *after* the variant's harness is installed, not against
             # the bare fixture: otherwise every file the installer writes (.claude/,
@@ -201,7 +226,9 @@ class ClaudeCodeHarness(ClaudeCode):
         # declares harness.init: the two fields are independent on a Variant
         # (owl/variants.py), so a variant could ship runtime_state without an
         # install step.
-        patterns = self._runtime_state_patterns()
+        # D13/R8: the round's artifact prefixes go to the same record, so notes/plans a
+        # variant writes there never count as changed, out of scope or against the reward.
+        patterns = self._runtime_state_patterns() + self._artifact_prefixes()
         if patterns:
             quoted = " ".join(shlex.quote(p) for p in patterns)
             await self.exec_as_root(
@@ -209,4 +236,7 @@ class ClaudeCodeHarness(ClaudeCode):
                 command=f"printf '%s\\n' {quoted} >> /var/lib/owl/ignore",
             )
 
+    async def run(
+        self, instruction: str, environment: BaseEnvironment, context: AgentContext
+    ) -> None:
         await super().run(instruction, environment, context)
