@@ -18,7 +18,8 @@ from pathlib import Path
 
 from owl.gate import check_jobs, write_report
 from owl.patient import ensure_patient_image_for_tasks
-from owl.round import Round
+from owl.round import Round, require_clean_tree, round_jobs_dir, round_tasks
+from owl.runner import execute_round
 from owl.summary import cmd_summary
 from owl.tasks import resolve_task_args
 from owl.validate import cmd_validate
@@ -137,7 +138,37 @@ def _effective_model(variants: list[Variant], model: str | None) -> str:
     return DEFAULT_MODELS[next(iter(agents))]
 
 
+def _run_round(args: argparse.Namespace) -> int:
+    """`owl run --round DIR`: validate like a plain run (refusals exit 2), then execute the plan."""
+    try:
+        round_def = Round.load(args.round)
+        require_clean_tree(round_def.dir)
+        variants = {vid: Variant.load(vid) for vid in round_def.variants}
+        env = _auth_env(str(round_def.raw.get("auth", "oauth")), list(variants.values()))
+        task_paths = [ROOT / t for t in round_tasks(round_def, args.holdout)]
+        ensure_patient_image_for_tasks(task_paths)
+        jobs_dir = round_jobs_dir(round_def)
+        for variant in variants.values():  # refuse unsupported agents before launching anything
+            _harbor_command(variant, task_paths[0], "preflight", jobs_dir, round_def.model, round_def)
+    except SystemExit as exc:
+        if isinstance(exc.code, str):
+            print(exc.code, file=sys.stderr)
+            raise SystemExit(2) from None
+        raise
+
+    def launch(variant: Variant, task: Path, job_name: str) -> int:
+        cmd = _harbor_command(variant, task, job_name, jobs_dir, round_def.model, round_def)
+        return subprocess.run(cmd, cwd=ROOT, env=env, check=False).returncode
+
+    return execute_round(round_def, variants, launch, holdout=args.holdout)
+
+
 def cmd_run(args: argparse.Namespace) -> int:
+    if args.round:
+        return _run_round(args)
+    if not args.variant:
+        print("-v/--variant is required without --round.", file=sys.stderr)
+        raise SystemExit(2)
     variants = [Variant.load(v) for v in args.variant]
     model = _effective_model(variants, args.model)
     env = _auth_env(args.auth, variants)
@@ -193,7 +224,11 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="Run variants on tasks (interleaved) through Harbor.")
-    run.add_argument("-v", "--variant", action="append", required=True)
+    run.add_argument("-v", "--variant", action="append", help="Repeatable. Required unless --round.")
+    run.add_argument(
+        "--round", default=None, metavar="DIR",
+        help="Run the round defined in DIR/round.yaml: blocked plan, concurrency, retries, stop rules.",
+    )
     run.add_argument("-t", "--task", action="append", help="Repeatable. Required unless --suite.")
     run.add_argument(
         "--suite", action="store_true",

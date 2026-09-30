@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-30 20:30 orchestrator — F3 lote 4 (T15-T17): planificador, ejecutor, cortacircuito, presupuesto y reanudación
+- Cambios: owl/round.py (`build_plan`/`plan_round`, `owl-plan.json`, validación de `concurrency` y `consecutive_infra`), owl/runner.py nuevo (`execute_round` con `launch` inyectable, barrera por bloque, reintento dentro del bloque, salidas 0/2/3/4), owl/cli.py (`owl run --round DIR [--holdout]`), owl/gate.py (`check_job`, `check_jobs(round_def)`, `TrialGate.resets_at`), tests.
+- Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 210 passed; reviewer APPROVED en ciclo 2 (ciclo 1 con 4 MEDIO corregidos).
+- Notas: costo desconocido falla cerrado solo en trials conservados (salida 4); uno excluido cuenta 0 y se reintenta, así una racha de infra de setup sigue saliendo con 3 (reanudable). El estado del ejecutor se reconstruye siempre desde los job dirs, así ejecución y reanudación comparten ruta. Marcador de presupuesto `owl-budget-stop.json`, log `owl-round.log`. La ruta real de `owl run --round` solo se ejercita en T21.
+- Commit / PR: branch feat/f3-lote4
+
 ## 2026-09-30 16:45 orchestrator — F3 lotes 2 y 3 (T7-T14): flags de ronda, gate D10, costo, gentle-ai, placebo y auditoría de artefactos
 - Cambios: owl/cli.py (flags de ronda), owl/gate.py (tabla D10, costo `reported`/`owl_estimate`), variants/gentle-ai.yaml y placebo.yaml, artifacts de navori/superpowers estrechados, specs/f3-ronda1 (cost-validation, spike-gentle-ai, artifacts-audit, tasks, design), tests.
 - Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 185 passed; docker gentle_ai y artifacts_excluded verdes (reviewer Pass 2, APPROVED en ambos lotes).

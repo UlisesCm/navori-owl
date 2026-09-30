@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from owl.gate import check_trial, estimate_cost_from_sessions
+from owl.gate import check_jobs, check_trial, estimate_cost_from_sessions
 from owl.round import Round
 
 VARIANT = {"id": "vanilla-default", "agent": "claude-code", "expect": {"plugins": [], "mcp_servers": []}}
@@ -250,6 +250,29 @@ def test_preamble_missing_is_contamination(tmp_path: Path) -> None:
     gate = check_trial(trial, ROUND_VARIANT, _round(tmp_path))
     assert gate.category == "contamination"
     assert any("preamble" in r for r in gate.reasons)
+
+
+def test_check_jobs_round_def_runs_conformance(tmp_path: Path) -> None:
+    """Covers: R13"""
+    job = tmp_path / "job"
+    job.mkdir()
+    _round_trial(job, "fix it")  # no preamble in the first user message
+    (job / "owl-variant.json").write_text(json.dumps(ROUND_VARIANT))
+    assert check_jobs(tmp_path)[0].passed is True
+    gate = check_jobs(tmp_path, _round(tmp_path))[0]
+    assert gate.category == "contamination" and any("preamble" in r for r in gate.reasons)
+
+
+def test_resets_at_captured_from_rejected_event(tmp_path: Path) -> None:
+    """Covers: R17"""
+    rl = {"type": "rate_limit_event", "rate_limit_info": {"status": "rejected", "resetsAt": 1790727000}}
+    assert check_trial(_trial(tmp_path, [INIT, rl, _result()]), VARIANT).resets_at == 1790727000
+
+
+def test_resets_at_none_without_rejection(tmp_path: Path) -> None:
+    """Covers: R17"""
+    rl = {"type": "rate_limit_event", "rate_limit_info": {"status": "allowed_warning", "resetsAt": 1790727000}}
+    assert check_trial(_trial(tmp_path, [INIT, rl, _result()]), VARIANT).resets_at is None
 
 
 def _assistant(mid: str, usage: dict) -> dict:

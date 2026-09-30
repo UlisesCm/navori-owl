@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import random
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -11,6 +13,7 @@ from typing import Any
 
 import yaml
 
+from owl.tasks import HOLDOUT_DIR, exit_refused, refuse_holdout
 from owl.variants import ROOT, Variant
 
 PRICE_KEYS = ("input", "output", "cache_read", "cache_write_5m", "cache_write_1h")
@@ -56,6 +59,12 @@ class Round:
         missing_prices = [k for k in PRICE_KEYS if k not in prices]
         if missing_prices:
             raise SystemExit(f"{path}: prices_usd_per_mtok is missing: {', '.join(missing_prices)}")
+        for key, value in (
+            ("concurrency", data.get("concurrency", 2)),
+            ("stop.consecutive_infra", (data.get("stop") or {}).get("consecutive_infra", 3)),
+        ):
+            if int(value) < 1:
+                raise SystemExit(f"{path}: {key} must be >= 1")
 
         artifacts: list[str] = []
         for vid in variant_ids:
@@ -118,3 +127,52 @@ def round_record(round_dir: Path | str, artifacts: list[str], root: Path = ROOT)
         "sha256": {"rules": sha["rules"], "round": sha["round"], "preamble": sha["preamble"]},
         "artifacts": list(artifacts),
     }
+
+
+def round_jobs_dir(round_def: Round, root: Path = ROOT) -> Path:
+    """Jobs directory of the round: ``jobs_dir`` of round.yaml, default ``jobs/<id>``."""
+    return (root / round_def.raw.get("jobs_dir", f"jobs/{round_def.id}")).resolve()
+
+
+def round_tasks(
+    round_def: Round, holdout: bool, root: Path = ROOT, holdout_dir: Path = HOLDOUT_DIR
+) -> list[str]:
+    """The round's tasks (root-relative); every holdout task joins only with ``holdout`` (R35, F2 R15)."""
+    refused = refuse_holdout([root / t for t in round_def.tasks], allowed=holdout)
+    if refused:
+        exit_refused("run", refused)
+    tasks = list(round_def.tasks)
+    if holdout:
+        found = sorted(p.parent.relative_to(root).as_posix() for p in holdout_dir.glob("*/task.toml"))
+        tasks += [t for t in found if t not in tasks]
+    return tasks
+
+
+def build_plan(
+    round_def: Round, holdout: bool = False, root: Path = ROOT, holdout_dir: Path = HOLDOUT_DIR
+) -> dict[str, Any]:
+    """k blocks, each with every (task, variant) pair once in an order drawn from ``plan_seed`` (R14)."""
+    raw = round_def.raw
+    pairs = [(t, v) for t in round_tasks(round_def, holdout, root, holdout_dir) for v in round_def.variants]
+    rng = random.Random(raw.get("plan_seed", 0))
+    trials: list[dict[str, Any]] = []
+    for block in range(1, int(raw.get("k", 1)) + 1):
+        order = pairs[:]
+        rng.shuffle(order)
+        trials += [{"block": block, "task": t, "variant": v} for t, v in order]
+    return {
+        "round": round_record(round_def.dir, round_def.artifacts, root),
+        "artifacts": list(round_def.artifacts),
+        "trials": trials,
+    }
+
+
+def plan_round(
+    round_def: Round, holdout: bool = False, root: Path = ROOT, holdout_dir: Path = HOLDOUT_DIR
+) -> dict[str, Any]:
+    """Build the plan and write it to ``<jobs_dir>/owl-plan.json`` before anything launches (R14)."""
+    plan = build_plan(round_def, holdout, root, holdout_dir)
+    jobs_dir = round_jobs_dir(round_def, root)
+    jobs_dir.mkdir(parents=True, exist_ok=True)
+    (jobs_dir / "owl-plan.json").write_text(json.dumps(plan, indent=2))
+    return plan

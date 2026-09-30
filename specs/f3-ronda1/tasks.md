@@ -177,17 +177,17 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
 
 ## Lote 4 — Planificador
 
-- [ ] **T15** (R14, R35) — `owl/round.py::plan_round`: k bloques, cada par (tarea, variante) una vez por
+- [x] **T15** (R14, R35) — `owl/round.py::plan_round`: k bloques, cada par (tarea, variante) una vez por
   bloque en permutación de `random.Random(plan_seed)`; holdout solo con `--holdout` (guard de F2 R15, sin
   campo en `round.yaml`); escribe `jobs_dir/owl-plan.json` con la unión de artefactos antes de lanzar ·
   test: `tests/test_round.py::test_plan_blocks_balanced`, `::test_plan_deterministic_by_seed`,
   `::test_plan_holdout_requires_flag`, con `# Covers: R14, R35`.
-- [ ] **T16** (R15, R16) — Ejecutor de `owl run --round`: pool de `concurrency` subprocesos `harbor run`,
+- [x] **T16** (R15, R16) — Ejecutor de `owl run --round`: pool de `concurrency` subprocesos `harbor run`,
   nombre de job `r1-<stamp>__<tarea>__<variante>__b<bloque>-a<intento>`, gate inmediato, reintento dentro
   del bloque de lo que la política excluye, barrera entre bloques · test:
   `tests/test_round.py::test_never_exceeds_concurrency`, `::test_block_barrier`,
   `::test_excluded_retried_kept_never_retried` (runner falso), con `# Covers: R15, R16`.
-- [ ] **T17** (R17, R18, R19) — Cortacircuito (cualquier `usage_limit` del gate —`rejected`, 429 o
+- [x] **T17** (R17, R18, R19) — Cortacircuito (cualquier `usage_limit` del gate —`rejected`, 429 o
   patrón— o `consecutive_infra` trials `infra` seguidos: drena y sale con 3, imprime `resetsAt` si lo hay;
   `usage_limit` no consume reintentos; `allowed_warning` solo se suma al log de la ronda), regla de
   presupuesto (proyección antes de cada bloque ≥ 2 y tope a mitad de bloque: drena y sale con 4; una ronda
