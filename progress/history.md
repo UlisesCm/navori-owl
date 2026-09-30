@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-30 22:20 orchestrator — F3 lote 0/1 y T18: piloto aplicado, ronda, variantes, harness, verifier y análisis
+- Cambios: `owl/round.py` (T3), `owl/variants.py` + `owl/validate.py` + `variants/{navori,superpowers}.yaml` (T4, chequeo `artifacts_clear`), `owl/agents/claude_code_harness.py` (T5, `install()` con los pasos del harness, `artifacts`, `OWL_CLAUDE_CONFIG_DIR`), `owl/verifier/lib.sh` + 13 copias `owl-lib.sh` (T6, `changes.tsv`), `owl/analysis.py` (T18), `scope.allow` de las tareas 10–15 (T1), `specs/f3-ronda1/indicators.md` (T2), `docs/task-authoring.md`, `docs/research/08-terminal-bench-y-harbor.md`.
+- Quality gate: ✅ `ruff check .` verde y 153 pruebas (`-m 'not docker'`); pruebas Docker de T5/T6 en verde; `owl validate --suite` 12/12 PASS (reviewer, APPROVED sin CRÍTICO ni ALTO).
+- Notas: (1) `lib.sh` excluye del patrón de línea de chequeo las líneas `import`, porque `import assert from "node:assert/strict"` contiene `assert`; registrado en design D13 e indicators.md. (2) `decoy_intact` (15) es familia propia, así que `scope_violation` sigue en el compuesto de la 15. (3) Hallazgos MEDIO del review sin corregir: etiquetas `Covers` de `tests/test_claude_code_harness.py`, imports multilínea con `assert` en `lib.sh`, falso positivo conservador de `a/` en `artifacts_clear`, `entry[3:]` con renames en `owl/round.py:96`. (4) Investigación de Terminal-Bench y Harbor documentada; candidatas para F3 (recursos de contenedor, sensibilidad a exclusiones, `HARBOR_TELEMETRY=0`, etiquetas de falla, revisión de trials aprobados) a decidir antes de T23.
+- Commit / PR: branch feat/f3-lote1
+
 ## 2026-09-29 23:15 orchestrator — F2 T17: piloto y cierre de F2
 - Cambios: specs/f2-suite-v1/pilot.md (una fila por tarea 10–21: éxitos, marca, costo, turnos, decisión y motivo; ajustes para el lote 0 de F3), specs/f2-suite-v1/tasks.md (T17), .claude/progress/pilot_audit_{a,b}.md (lectura de los 24 transcripts).
 - Quality gate: ✅ sin cambios de código; reviewer APPROVED en ciclo 2 (solo documentación).

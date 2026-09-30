@@ -32,14 +32,14 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
 
 ## Lote 0 — Piloto aplicado
 
-- [ ] **T1** (R38) — Aplicar los "Ajustes a aplicar" de `pilot.md` (D18), todos data-only y sin cambiar
+- [x] **T1** (R38) — Aplicar los "Ajustes a aplicar" de `pilot.md` (D18), todos data-only y sin cambiar
   ningún reward: `scope.allow` de 11 y 12 (+ `packages/db/test/*`), 13 (+ `packages/core/test/*`), 10
   (+ `packages/cli/test/*`), 15 (+ `packages/api/test/*`, `packages/db/test/*`) y 14
   (`packages/core/src/tag*.ts`, `packages/db/migrations/*.sql`). Los ajustes 3 y 4 van a T2 y T23; el 6, a
   T19. Anotar al final de `pilot.md` la lista final de tareas dev y qué ajuste se aplicó · test:
   `owl validate -t <tarea>` en verde por cada tarea cambiada (`owl-validate.json`) y `owl_reward` sin
   cambios en sus `task.toml` (`git diff`).
-- [ ] **T2** (R2, R30, R31) — Auditoría de indicadores de comportamiento (D13): tabla (dimensión,
+- [x] **T2** (R2, R30, R31) — Auditoría de indicadores de comportamiento (D13): tabla (dimensión,
   polaridad mala, familia, tareas que la emiten, tareas donde su familia gatea el reward según
   `owl_reward` del `task.toml`, evidencia `owl_dim` del `test.sh`), incluidos `scope_violation` (con la
   excepción "solo notas") y `test_weakened` (con el patrón de línea de chequeo de D13), más las notas del
@@ -55,7 +55,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
 
 ## Lote 1 — Ronda, esquema, setup y verifier
 
-- [ ] **T3** (R1, R3, R4, R5) — `owl/round.py`: `Round.load(dir)` lee y valida `round.yaml` (variantes y
+- [x] **T3** (R1, R3, R4, R5) — `owl/round.py`: `Round.load(dir)` lee y valida `round.yaml` (variantes y
   tareas existen, todas comparten `agent_version`, `baseline` y `placebo` están en `variants`,
   `prices_usd_per_mtok` trae `input`, `output`, `cache_read`, `cache_write_5m` y `cache_write_1h`) y calcula
   la unión de `artifacts` de las variantes; chequeo de árbol limpio sobre `rounds/<id>/`, `tasks/`,
@@ -65,7 +65,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   `::test_load_rejects_unknown_task_or_variant`, `::test_load_requires_split_cache_prices`,
   `::test_artifacts_union`, `::test_dirty_tree_refused_with_paths` (repo git temporal),
   `::test_round_record_hashes`, con `# Covers: R1, R3, R4, R5`.
-- [ ] **T4** (R7, R8, R9) — `owl/variants.py::Variant`: campos `append_system_prompt` y `artifacts`;
+- [x] **T4** (R7, R8, R9) — `owl/variants.py::Variant`: campos `append_system_prompt` y `artifacts`;
   `Variant.load` rechaza un prefijo que no termina en `/`, que está bajo `packages/` o que contiene algún
   archivo de `patient/`. `owl/validate.py`: chequeo estático `artifacts_clear` (D13) en `static_checks`:
   falla si un archivo de `environment/` está bajo un prefijo de `variants/*.yaml` o nombra una ruta bajo uno
@@ -79,7 +79,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   `::test_artifacts_clear_fails_on_path_named_in_patch_or_script`,
   `::test_artifacts_clear_holdout_reports_name_only`, `::test_artifacts_clear_passes_dev_suite`, con
   `# Covers: R8`.
-- [ ] **T5** (R8, R12) — `ClaudeCodeHarness.install()`: `await super().install(environment)` y después,
+- [x] **T5** (R8, R12) — `ClaudeCodeHarness.install()`: `await super().install(environment)` y después,
   siempre, lo que hoy hace `run()` antes de `super().run()` (plugins, `init`, commit "variant installed",
   `update-ref`, registro y snapshot como root, `runtime_state`) más el kwarg nuevo `artifacts` agregado a
   `/var/lib/owl/ignore` como root; exporta `OWL_CLAUDE_CONFIG_DIR` (`environment_logs_dir / "sessions"`) a
@@ -90,7 +90,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   `tests/test_validate_docker.py::test_artifacts_excluded_keep_scope_reward` (`-m docker`: tarea 18 con
   su oracle y un archivo bajo un prefijo de la unión → reward y `scope` sin cambio, archivo en
   `runtime-state-files.txt`), `# Covers: R8`; `::test_navori_install_on_patient` sigue en verde.
-- [ ] **T6** (R31, R32) — `owl/verifier/lib.sh`: `owl_changes` registra el tipo de cada archivo cambiado
+- [x] **T6** (R31, R32) — `owl/verifier/lib.sh`: `owl_changes` registra el tipo de cada archivo cambiado
   (`added`/`modified`/`deleted`, desde `base_map`/`cur_map`) y, para cada archivo de test presente en el
   baseline, líneas agregadas, quitadas y de chequeo quitadas por `diff` de contenido contra el blob del
   baseline (un borrado se compara contra vacío); patrón de línea de chequeo de D13 como constante
@@ -197,7 +197,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
 
 ## Lote 5 — Análisis y reporte
 
-- [ ] **T18** (R26, R27, R28, R29) — `owl/analysis.py` (stdlib): `sign_flip_p` exacto, `task_bootstrap_ci`
+- [x] **T18** (R26, R27, R28, R29) — `owl/analysis.py` (stdlib): `sign_flip_p` exacto, `task_bootstrap_ci`
   (devuelve `None` cuando todos los valores son iguales, para imprimir conteos por brazo), `holm`,
   `log_cost_ratios`, `rate_differences`, `pass_hat_k` · test: `tests/test_analysis.py` con los casos
   calculados a mano de `design.md` Testing strategy (sign-flip 0.25 y 1; Holm `[0.03, 0.06, 0.06, 0.02]`;
