@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** en curso — F2 lote 9: T16 (`owl summary`) aprobada y en publicación (PR `feat/f2-lote9-summary` → `main`). T17 (piloto `vanilla-default`, Haiku, k=2, 12 tareas dev) corriendo en `jobs/pilot-f2`; siguiente: `owl summary jobs/pilot-f2` y `specs/f2-suite-v1/pilot.md` con la decisión por tarea.
+**Estado:** F2 cerrada (T0–T17). Siguiente: F3 — Ronda 1 con SDD (`specs/f3-ronda1/`, en revisión tras el challenge; decisiones del usuario: endpoints costo + comportamiento, placebo de una línea, gentle-ai con defaults, concurrencia 2, tope $250). El lote 0 de F3 aplica los ajustes de `specs/f2-suite-v1/pilot.md`.
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.

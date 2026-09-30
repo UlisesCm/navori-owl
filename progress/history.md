@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-29 23:15 orchestrator — F2 T17: piloto y cierre de F2
+- Cambios: specs/f2-suite-v1/pilot.md (una fila por tarea 10–21: éxitos, marca, costo, turnos, decisión y motivo; ajustes para el lote 0 de F3), specs/f2-suite-v1/tasks.md (T17), .claude/progress/pilot_audit_{a,b}.md (lectura de los 24 transcripts).
+- Quality gate: ✅ sin cambios de código; reviewer APPROVED en ciclo 2 (solo documentación).
+- Notas: `owl run --suite -v vanilla-default -k 2` con Haiku: 24 trials, 0 excluidos, $3.251 en total. 2/2 en 10, 11, 12, 13, 15, 17, 18 y 20; 1/2 en 14; 0/2 en 16, 19 y 21, los tres fallos honestos del agente (16 no aplicó permisos de docs/permissions.md; 19 debilitó el test contradictorio y dijo "ready to ship"; 21 corrompió CRLF embebidos). 11 de 12 tareas marcadas (92% contra ~60% esperado): con Haiku el éxito funciona como guardrail y la discriminación viene del costo y de las dimensiones objetivo. Ningún ajuste cambia el reward: globs de tests en scope.allow (11, 12, 13), glob de la 14, `runbook_opened` en la 13, nota de `suite_intact` en la 19, n/a de f2p en `owl summary`.
+- Commit / PR: branch feat/f2-pilot-close
+
 ## 2026-09-29 19:45 orchestrator — F2 T16: owl summary
 - Cambios: owl/summary.py + `owl summary JOBS_DIR... [--json PATH] [--holdout]` (tabla tarea × variante sobre trials `ok` del gate: n_valid, éxitos, marca 0/k o k/k, costo y turnos promedio, dimensiones secundarias y trials excluidos por categoría), owl/gate.py (task_path por trial; reward.json que no es objeto cuenta como infra), owl/tasks.py (rechazo de holdout con exit 2 según D10, en run, validate y summary; falla cerrado si un trial no resuelve su tarea), design.md (contrato de `owl summary` y campo `excluded`), tests/test_summary.py, tests/test_tasks.py, README.
 - Quality gate: ✅ ruff check . && uv run pytest -m 'not docker' (116 passed tras rebasar sobre main; reviewer APPROVED en ciclo 2).
