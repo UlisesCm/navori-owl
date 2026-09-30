@@ -1,0 +1,10 @@
+# Placebo: vanilla-default plus a neutral system-prompt line, to separate "any extra prompt" from a real harness.
+id: placebo
+description: Claude Code sin harness, con una línea neutra añadida al system prompt (control de placebo).
+agent: claude-code
+agent_version: "2.1.281"
+harness:
+  append_system_prompt: "Keep changes minimal and verify your work."
+expect:
+  plugins: []
+  mcp_servers: []

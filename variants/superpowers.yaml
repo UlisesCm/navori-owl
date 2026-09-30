@@ -7,10 +7,18 @@ harness:
     - name: superpowers
       git: https://github.com/obra/superpowers
       ref: 5bf4e78011075bcfc0dc295f0724994cd123ee71   # v6.4.1, 2026-09-22
-  # source: superpowers v6.4.1 skills/brainstorming/SKILL.md:135 (specs) and
-  # skills/executing-plans/SKILL.md:329 (plans) write under docs/superpowers/.
+  # source: superpowers v6.4.1 skills/writing-plans/SKILL.md:18 (plans) and
+  # skills/brainstorming/SKILL.md:135 (specs) write under docs/superpowers/plans/ and
+  # docs/superpowers/specs/ (narrowed in T14).
   artifacts:
-    - "docs/superpowers/"
+    - "docs/superpowers/specs/"
+    - "docs/superpowers/plans/"
+  # source: superpowers v6.4.1 scripts write .superpowers/sdd/<plan-basename>/ and
+  # .superpowers/brainstorm/ (skills/subagent-driven-development/scripts/sdd-workspace:6,24,
+  # review-package:8; skills/brainstorming/scripts/start-server.sh:9,117-121): plugin-written
+  # state, not agent output (T14).
+  runtime_state:
+    - ".superpowers/"
   env:
     SUPERPOWERS_DISABLE_TELEMETRY: "1"
 expect:
