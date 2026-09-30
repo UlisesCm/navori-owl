@@ -304,9 +304,11 @@ $ ls -la ~/.local/bin
 ## 11. No comprobado
 
 - Lo que el `claude` real escribe con `plugin install engram` / `mcp add --scope user` (y si lo hace bajo
-  `CLAUDE_CONFIG_DIR`): solo hay stub. Causa: no hay Claude Code en la imagen; bajarlo excede la red permitida.
-  T12 debe correr `gentle-ai install` con el `claude` real (`tests/test_validate_docker.py::test_gentle_ai_install_on_patient`)
-  y confirmar `ls $OWL_CLAUDE_CONFIG_DIR` y `~/.claude*`.
+  `CLAUDE_CONFIG_DIR`): en este spike solo hubo stub, porque no había Claude Code en la imagen. La
+  comprobación con `claude` real se difirió y se hizo en el smoke de T21 (`specs/f3-ronda1/smoke.md`): la
+  instalación real carga el plugin `engram` y el MCP de usuario `engram`, y `.mcp.json` agrega `context7`
+  (ver `expect` en `variants/gentle-ai.yaml`). El test Docker
+  `tests/test_validate_docker.py::test_gentle_ai_install_on_patient` cubre la instalación sobre el paciente.
 - El montaje real de `/logs/agent` por Harbor (emulado con las llamadas de `environments/base.py`).
 - La firma minisign del release (no verificada por diseño, D3).
 - Compatibilidad de `engram 2.1.0` con `--protocol=slim`.
