@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-30 22:10 orchestrator — F3 T21 (parte 2): gentle-ai en el gate y smoke.md
+- Cambios: variants/gentle-ai.yaml (expect plugins [engram], mcp_servers [context7, engram]), owl/gate.py (`_mcp_connected_later`: un MCP declarado `pending` en init pasa solo si un `deferred_tools_delta` posterior de la sesión agrega sus tools), design.md D3/D10, specs/f3-ronda1/smoke.md, tasks.md (T21).
+- Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 262 passed; reviewer APPROVED (2 MEDIO teóricos).
+- Notas: segundo smoke con límites reales: 6 variantes ok con conformidad en tasks/02-smoke-patient; forzados con subtipos `error_max_turns`/`error_max_budget_usd` y timeout con `cost_source = owl_estimate` (solo con round_def). context7 es npx/stdio y arranca `pending` siempre; el spike T11 no vio engram porque usó un `claude` de mentira. Concurrencia 2 definitiva. Costo total del smoke $1.455.
+- Commit / PR: fix en PR #22 (mergeado); smoke.md y la suma de `num_turns` (navori: 6 `result`, 26 turnos, el gate leía 3) en feat/f3-t21-smoke-doc
+
 ## 2026-09-30 21:50 orchestrator — F3 T21 (parte 1): tarea smoke sobre el paciente y límites de ronda anidados
 - Cambios: tasks/02-smoke-patient nueva (bug `toCsv` RFC 4180, `owl_type = "smoke"`, validate PASS), owl/round.py (`Round.limits` obligatorio con 4 claves, falla fuerte), owl/cli.py (`_round_flags` siempre emite los 4), owl/gate.py (conformidad compara `max_turns` y `max_budget_usd`), owl/report.py, tests.
 - Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 257 passed; reviewer APPROVED.
