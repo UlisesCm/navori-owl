@@ -18,6 +18,7 @@ from pathlib import Path
 
 from owl.gate import check_jobs, write_report
 from owl.patient import ensure_patient_image_for_tasks
+from owl.report import cmd_report
 from owl.round import Round, require_clean_tree, round_jobs_dir, round_tasks
 from owl.runner import execute_round
 from owl.summary import cmd_summary
@@ -263,6 +264,14 @@ def main() -> None:
     summary.add_argument("--json", default=None, help="Also write the cells as JSON to this path.")
     summary.add_argument("--holdout", action="store_true", help="Required to summarize any holdout task (R15).")
     summary.set_defaults(func=cmd_summary)
+
+    report = sub.add_parser("report", help="Round report (report.md + report.json) from the round's gated trials.")
+    report.add_argument("--round", required=True, help="Round directory, e.g. rounds/r1.")
+    report.add_argument(
+        "--holdout", action="store_true",
+        help="Required when the round's jobs hold holdout trials (R36); adds an uncalibrated descriptive section.",
+    )
+    report.set_defaults(func=cmd_report)
 
     validate = sub.add_parser(
         "validate", help="Free checklist (oracle x5, nop, CheatAgent attacks): owl-validate.json, no model calls."
