@@ -228,7 +228,9 @@ def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict, stall_mi
         gate.cost_usd = result.get("total_cost_usd")
         if gate.cost_usd is not None:
             gate.cost_source = "reported"
-        gate.num_turns = result.get("num_turns")
+        # A delegating harness ends a turn per wait, so the stream carries several result events,
+        # each with its own num_turns: the trial's turns are their sum (cost stays session-wide on the last).
+        gate.num_turns = sum(e.get("num_turns") or 0 for e in events if e.get("type") == "result")
         subtype_limit = _LIMIT_BY_SUBTYPE.get(str(result.get("subtype")))
         if subtype_limit:
             gate.limit_hit = subtype_limit

@@ -230,7 +230,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
 
 ## Lote 6 — Smoke
 
-- [ ] **T21** (R6, R7, R10, R11, R13, R17, R20, R21, R25) — Smoke con Haiku sobre `00-smoke` (no es tarea
+- [x] **T21** (R6, R7, R10, R11, R13, R17, R20, R21, R25) — Smoke con Haiku sobre `00-smoke` (no es tarea
   de suite), en un `jobs_dir` aparte: las 6 variantes k = 1 a concurrencia 2 con preámbulo, límites y
   artefactos de la ronda; forzados: `max_turns = 2`, presupuesto mínimo y un timeout (multiplicador
   mínimo) para fijar subtipos, confirmar `timestamp` en el stream cortado y que el transcript de sesión del
