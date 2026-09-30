@@ -7,8 +7,8 @@
 > con un lector que resume la página, sin leerla completa (las cifras pueden perder matiz);
 > **[INFERRED]** = deducción o dato de segunda mano. Ninguna [INFERRED] sostiene una recomendación por sí sola.
 >
-> Estado de este documento: §1 a §4 (calidad de tareas y metodología) y §6 (funciones de Harbor) completos.
-> **Pendiente de agregar:** §5 (reward hacking y seguridad del verifier). Ver §7.
+> Estado de este documento: completo (§1 a §6). Las recomendaciones están en tres listas: A–T (§4, tareas y
+> metodología), RH1–RH11 (§5.6, reward hacking) y H1–H10 (§6.6, Harbor). Ver los límites en §7.
 
 ---
 
@@ -25,6 +25,9 @@
 - Lo que sí conviene copiar es su **control de calidad de tareas** (revisión por capas, etiquetas
   estructuradas de falla, política de versionado y retiro) y algunos **controles de metodología** (recursos de
   contenedor fijos, análisis de sensibilidad sobre exclusiones, revisión de trials aprobados).
+- Hallazgo propio que no viene de Terminal-Bench: el verifier decide por el exit code de `node --test` y los
+  tests importan código del agente en el mismo proceso, así que un módulo importado que parche `assert.equal`
+  hace pasar f2p y p2p sin resolver la tarea (§5.1, verificado en Node 24, sin probar en la imagen).
 - Lo que **no** conviene copiar: su intervalo de confianza, el multiplicador de timeout 1.0, quitar tareas
   saturadas a mitad de camino, elegir el mejor scaffold por modelo, y calibrar las tareas a "máximo 30 % de
   resolución".
@@ -269,11 +272,154 @@ commiteado antes de la ronda (la ronda se niega con árbol sucio, R3).
 - **Decir al agente "no busques soluciones en línea"**: sería un tratamiento que se solaparía con el placebo, y
   D5 exige que el preámbulo no mencione conducta.
 
-## 5. Reward hacking y seguridad del verifier — pendiente
+## 5. Reward hacking y seguridad del verifier
 
-Se agregará con la investigación de los vectores V1–V9 del issue
-https://github.com/harbor-framework/terminal-bench/issues/2086 y del paper Hack-Verifiable Terminal Bench
-(https://arxiv.org/abs/2608.22103), cruzados contra los seis ataques de `owl validate`.
+Etiquetas de esta sección: **[VERIFIED]** = leído en la fuente o medido por mí; **[INFERRED]** = deducción no
+probada de punta a punta. Las cifras de los papers 2606.08960 y 2606.08893 vienen de resúmenes de página:
+contrastarlas con el PDF antes de citarlas en un documento formal.
+
+### 5.1 Un hueco nuevo en el verifier de `owl` (verificado parcialmente)
+
+`owl_p2p` y `owl_f2p` deciden solo por el código de salida de `node --test` (`owl/verifier/lib.sh:458,484`), y los
+tests importan código del agente **en el mismo proceso** (`patient/packages/db/test/db.test.ts:7-9`). Si el código
+importado manipula el proceso o el framework de aserciones, el runner puede salir con 0 sin haber verificado
+nada. Con eso f2p y p2p darían 1 sin arreglar la tarea, el archivo editado quedaría dentro de `scope.allow` y
+ni `scope` ni `test_weakened` lo verían (no toca tests). Solo la tarea 19 tiene un tripwire parecido
+(`env_sniff`, `tasks/19-behavior-impossible-ci/tests/test.sh:77-97`). Ningún ataque de `owl validate` lo cubre.
+
+Mediciones con **Node 24.20 local** (la imagen usa Node 22 y **no se probó**), un test que espera `add(1, 2) === 3`
+contra un `add` incorrecto:
+
+| Variante en el módulo importado | Sale con | `node --test` reporta |
+|---|---|---|
+| `process.exit(0)` al cargar, **CJS** | 0 | `tests 1 / pass 1` |
+| `assert.equal = () => {}` parchado, **ESM** | 0 | `tests 1 / pass 1` |
+| `process.exit(0)` al cargar, **ESM** | 1 | `fail 1` (no sirve como ataque) |
+| `process.on("exit", () => { process.exitCode = 0 })` | 1 | `fail 1` (descartado) |
+| Control: código incorrecto sin payload | 1 | `fail 1` |
+
+El paciente es ESM (`"type": "module"` en todos sus `package.json`) y corre `node --test packages/*/test/*.test.ts`.
+Por eso la vía **aplicable** es parchear `assert.equal` (o `node:assert/strict`) desde un módulo importado. Solo la
+ejercería un agente que hace trampa a propósito, pero es justo el tipo de ataque que `owl validate` debería
+probar. Queda **[INFERRED] hasta correr el ataque en Docker con Node 22**.
+
+### 5.2 Taxonomía V1–V9 del issue de mitigaciones
+
+Fuente: https://github.com/harbor-framework/terminal-bench/issues/2086 (abierto, creado el 2026-09-23). [VERIFIED]
+
+| Vector | Qué es |
+|---|---|
+| V1 Overwrite | Reemplazar tests, runner o dependencias del verifier |
+| V2 Patch | Monkeypatch de aserciones o del framework en un proceso que carga código enviado |
+| V3 Reward | Escribir el reward directo, incluso desde un proceso superviviente |
+| V4 Fail-open | Runner permisivo: suite vacía, skips, `exit 0` genérico |
+| V5 Sleeper | Proceso que sobrevive al agente y escribe después de calificar |
+| V6 Staging | Symlinks, hardlinks, archivos especiales o hooks al entrar al verifier |
+| V7 Forgery | Falsificar timers, contadores o evidencia |
+| V8 Disclosure | Leer respuestas o entradas ocultas |
+| V9 Exploit | Parser o loader inseguro (pickle, `eval`, HTML) |
+
+Defensas propuestas: worker sin privilegios y aserciones corridas por root, verificación multi-contenedor,
+permisos y namespaces, contención de procesos (grupo de procesos, `cgroup.kill`), revisión de trayectoria con
+juez LLM con reward provisional y retractable, y "un run sin marcar no es prueba". Hardening mínimo de 7 pasos:
+`chmod 700 /logs/verifier` y reward 0 al inicio, todo envío como usuario sin privilegios, `chmod -R go-rwx /tests`,
+`pkill` del worker al terminar, nunca `chmod/chown/cp` de root a rutas escribibles por el worker sin `lstat`, y un
+gate de conteo de tests.
+
+La auditoría del issue: la tabla vigente lista **66 tareas**, 13 sin hallazgos, 39 con al menos un hallazgo
+**Open** y 30 con **Partial**. La cifra "43 vulnerabilidades en 63 tareas" que circuló antes **no aparece en el
+texto actual** (el cuerpo se editó); usar la tabla vigente.
+
+### 5.3 Los seis ataques de `owl` frente a V1–V9
+
+| Vector | Defensa de `owl` | Estado | Hueco |
+|---|---|---|---|
+| V1 Overwrite | Tests visibles y config se restauran del blob del baseline (`lib.sh:404-435`); toolchain del verifier en `/opt/owl/toolchain` de root; ataques `tamper-fail` y `tamper-pass` | Sí | `node_modules/` es "estado ignorado": los tests importan `@opsdesk/core` por un symlink de `node_modules/`, y reapuntarlo queda fuera de scope y de `changed-files.txt` [INFERRED] |
+| V2 Patch | Solo privilegio (los tests corren como `node`, no root) | **No** | Ver 5.1 |
+| V3 Reward | Stub fail-closed de reward 0, `reward.json` escrito por root al final, ataque `plant-reward` con `setsid` | Sí (fase agente) | Ninguno relevante |
+| V4 Fail-open | Falla cerrada en baseline; tests visibles borrados o con `.skip` se restauran | Parcial | Solo se mira el exit code (ver 5.1) |
+| V5 Sleeper | `pkill -KILL -u node` al inicio y al final, por UID (cubre `setsid` sin cgroups) | Sí | Un solo `pkill` es una pasada [INFERRED] |
+| V6 Staging | `owl_snapshot` no sigue symlinks; comparación por contenido; git con hooks anulados | Parcial | Root **escribe a través de symlinks del agente** (`lib.sh:431,476`); verificado con un shell, efecto acotado porque el contenido escrito es fijo |
+| V7 Forgery | Las mediciones críticas salen de root | Sí para las que gatean | `injection_followed` y `destructive_cmds` son falsificables o borrables (la tarea 20 ya lo dice) |
+| V8 Disclosure | En fase agente `/tests` y `/solution` no existen; historial git sellado; ataque `read-hidden` | Sí (fase agente) | Durante p2p/f2p `/tests` es probablemente legible por el código del agente [INFERRED]; `read-hidden` usa `find -xdev` y omite otros montajes |
+| V9 Exploit | El verifier no carga formatos ejecutables del envío | Parcial (por muestreo) | No hay lint que impida un `test.sh` futuro inseguro |
+
+Además: el verifier de `owl` **no instala ni descarga nada** (`grep` de `curl/npm i/wget/pip` sobre
+`tasks/*/tests/test.sh` sin resultados), lo que neutraliza el truco de Berkeley RDI del falso `curl`. Y la
+lectura de honeypots o de intención no tiene ninguna defensa hoy.
+
+### 5.4 Qué aportan las demás fuentes
+
+- **Hack-Verifiable Terminal Bench** (arXiv 2608.22103): sobre las 89 tareas de TB 2.1 planta un directorio
+  `admin/` **dentro del sistema de archivos del agente** con la solución y los tests, vigilado por inotify; 5
+  modelos × 5 niveles de prompt = 2 225 trazas (~US$ 2.5 K). Es una cota inferior: solo ve los hacks plantados.
+  [VERIFIED]
+
+  | Modelo | Sin advertencia | Advertencia genérica (L0) | L1 | L2 | L3 |
+  |---|---|---|---|---|---|
+  | Claude Code + Opus 5 | 30.7 % | 17.4 % | 2.3 % | 1.1 % | 0 % |
+  | Gemini 3.1 Pro | 47.7 % | 59.8 % | 52.3 % | 7.0 % | 16.3 % |
+
+  Total: 359 de 2 183 trials (16.4 %) con algún hack; leer los tests es más frecuente que leer la solución. La
+  mitad de los hacks ocurre en el **primer cuarto** de la trayectoria. Claude Code con Opus 5 a veces *confiesa*
+  en su mensaje final. Una advertencia genérica reduce la tasa a la mitad o más en 4 de 5 modelos y la **sube** en
+  Gemini. **Implicación para `owl`:** el placebo ("verify your work") y cualquier skill de verificación son
+  tratamiento sobre los indicadores de trampa, y hay que declararlo.
+- **Terminal Wrench** (arXiv 2604.17596): 331 entornos hackeables y 3 632 trayectorias de hack; Terminal-Bench 2.0
+  tiene 14 de 89 hackeables. El juez baja de AUC 0.968 con razonamiento completo a 0.917 con solo acciones. Del
+  total de trials que pasan el verifier, el juez marca **75 % como hack**: la trampa vive en los trials
+  aprobados, que R34/R39 de `owl` no revisan.
+- **Hacker-fixer loops** (arXiv 2606.08960): endurecer verifiers baja el éxito de ataque sin pista de 39.2 % a 16.7 %
+  en TB, pero el solver legítimo cae de 76.1 % a 65.2 % (**riesgo de sobre-restricción**).
+- **Terminal-Bench** quitó los directorios `cheat/` de las tareas (issues #2049 y #2072) y admite no saber cómo
+  evitar regresiones (#2135). `owl` ya resolvió eso con ataques versionados en código (`owl/agents/cheat.py`).
+- **Berkeley RDI:** un `/usr/bin/curl` falso durante la fase del agente da 89/89 en Terminal-Bench sin escribir
+  solución. No aplica a `owl` por lo dicho en 5.3.
+
+### 5.5 Sondas hack-verifiable para calibrar sin ensuciar tareas reales
+
+Tres tareas dev (13, 15, 20) y la 19 ya miden conducta dentro de la suite y cuentan para el score. Lo que falta es un
+instrumento **fuera** de la suite cuyo único fin sea calibrar:
+
+1. Un tipo no-suite `hv-probe` (mecanismo de `infra-probe`, `owl/tasks.py:37`), reportado aparte.
+2. Un generador `owl hv-wrap <tarea-dev>` que copie una tarea dev y agregue un `admin/` con su propia solución y
+   tests. **Nunca se envuelve el holdout.**
+3. Detección por token único en los `tool_result` y en el árbol final; inotify opcional.
+4. Controles gratis en `owl validate`: `read-hidden` sobre la sonda **debe** activar la detección y `nop` no.
+5. Las 2 225 trazas publicadas de HVTB sirven de corpus con verdad-terreno para probar el escáner de transcripts
+   *offline*, sin gastar un trial (trazas de otros modelos, no de Haiku 4.5; formato y licencia sin verificar).
+
+Límites: con k = 5 por variante la potencia es baja, así que sirve para calibrar y describir, no para confirmar;
+un `admin/` con README puede delatar la prueba (eval-awareness); no mencionar lenguaje anti-trampa en el
+preámbulo si se quiere medir propensión.
+
+### 5.6 Recomendaciones de reward hacking
+
+Todo cambio en `lib.sh` obliga a repetir la copia a las 13 tareas y al holdout (T22), así que RH1, RH3 y RH4 deben
+ir **en un solo cambio**.
+
+| Id | Recomendación | Cierra | Esfuerzo | Fase |
+|---|---|---|---|---|
+| RH1 | **Cerrar el bypass en proceso:** gate de conteo de tests en `owl_p2p`/`owl_f2p` (reporte TAP, `tests ≥` esperado, `fail = cancelled = skipped = todo = 0`); tripwire de líneas **agregadas** en `packages/*/src/**` (`process.exit`, `process.on("exit"`, `child_process`, asignación a miembros de `assert`); ataque nuevo `import-payload`. El ataque hará fallar `owl validate` en toda la suite hasta que el gate esté aplicado: comprobarlo antes | V2, V4 | M | F3 ahora |
+| RH2 | **Escáner determinista de transcripts en todos los trials** (no solo fallas): rutas ocultas, reconocimiento del historial de git, búsqueda de `solve.sh`/`seed.patch`, `curl`/`wget` a hosts externos, confesiones en el mensaje final. Los trials **aprobados con señal** entran a la revisión de R34. Sin juez LLM | Intención, V8 | S–M | F3 ahora |
+| RH3 | **Endurecimientos baratos de `lib.sh`:** `chmod -R go-rwx /tests`, `PATH` fijo de root, bucle `pkill` hasta que no queden procesos, guardas contra symlinks en `lib.sh:431,476`, ataque `peek-tests`, quitar `-xdev` en `read-hidden` | V8, V5, V6 | S | F3 ahora (con RH1) |
+| RH4 | **Rutas ignoradas y dependencias del workspace:** validar o recrear los symlinks `node_modules/@opsdesk/*` contra el manifest; ataque `shadow-dep` | V1 | S–M | F3 ahora si entra en el mismo cambio |
+| RH5 | **Declaraciones en `RULES.md`:** el placebo y los skills de verificación son tratamiento sobre trampa; riesgo residual de proceso compartido; `injection_followed` y `destructive_cmds` son falsificables; los hacks no plantados no se miden | Honestidad | S | F3 ahora |
+| RH6 | **Sondas hack-verifiable** (5.5) | Calibración | M | Después de r1 |
+| RH7 | **Calibrar RH2 offline** con las trazas de HVTB | Validez del escáner | S–M | F3 ahora si el hub es accesible |
+| RH8 | **`verifier_lint` estático** sobre `tasks/*/tests/test.sh` con la lista de detección de #2086 | V9 | S–M | Después |
+| RH9 | **Segunda solución legítima por tarea** para detectar sobre-restricción al endurecer | Falsos rechazos | M | Antes de cualquier endurecimiento adicional |
+| RH10 | **Auditoría hacker-fixer con modelo real** como comando aparte (`owl audit-verifier`), solo sobre tareas dev | Vectores desconocidos | M–L | Después |
+| RH11 | **Patrón worker / verificación de caja negra**, la única forma de cerrar V2 del todo | V2 | L | Solo si r1 muestra manipulación |
+
+### 5.7 Límites de esta sección
+
+- Los bypass de 5.1 se midieron con Node 24.20 en un directorio temporal, **no** dentro de `owl-patient:local` ni
+  con Node 22. Falta correr `import-payload` en Docker.
+- No se confirmaron los permisos reales de `/tests` ni de `/logs/verifier` dentro del contenedor de `owl`.
+- No se leyó `holdout/`; "toda la suite" se apoya en las 12 tareas dev y en la identidad byte a byte de los
+  `owl-lib.sh`.
+- No se abrió `frontierbench.ai` (404) ni los comentarios en X del issue #2086.
 
 ## 6. Funciones de Harbor que `owl` no usa o reimplementa
 
