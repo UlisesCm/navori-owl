@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-30 21:10 orchestrator — F3 lote 5 (T19-T20): owl report, política de exclusión, lista de fallas y holdout
+- Cambios: owl/report.py nuevo (`owl report --round DIR [--holdout]`: report.md y report.json, secciones D14 1-10), owl/summary.py (`tampered` conservado como fracaso, `f2p` n/a, `held_jobs` rechaza holdout antes de leer logs), owl/gate.py (`TrialGate.result_event`), owl/cli.py, tests.
+- Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 243 passed; reviewer APPROVED.
+- Notas: branch apilada sobre feat/f3-lote4 porque el PR #19 seguía abierto. Alcance ampliado con OK del usuario a owl/gate.py (reusar `check_job`, `result_event` en lugar del proxy `cost_source`). Deuda (4 MEDIO): `_gate_jobs` sigue recorriendo jobs para leer bloque e intento, report importa helpers privados de summary, falta test de job holdout sin trial (verificado a mano), `_holdout_ref_of` duplica el parseo de `_task_name`.
+- Commit / PR: branch feat/f3-lote5-report
+
 ## 2026-09-30 20:30 orchestrator — F3 lote 4 (T15-T17): planificador, ejecutor, cortacircuito, presupuesto y reanudación
 - Cambios: owl/round.py (`build_plan`/`plan_round`, `owl-plan.json`, validación de `concurrency` y `consecutive_infra`), owl/runner.py nuevo (`execute_round` con `launch` inyectable, barrera por bloque, reintento dentro del bloque, salidas 0/2/3/4), owl/cli.py (`owl run --round DIR [--holdout]`), owl/gate.py (`check_job`, `check_jobs(round_def)`, `TrialGate.resets_at`), tests.
 - Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 210 passed; reviewer APPROVED en ciclo 2 (ciclo 1 con 4 MEDIO corregidos).
