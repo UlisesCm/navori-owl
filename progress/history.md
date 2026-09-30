@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-30 16:45 orchestrator — F3 lotes 2 y 3 (T7-T14): flags de ronda, gate D10, costo, gentle-ai, placebo y auditoría de artefactos
+- Cambios: owl/cli.py (flags de ronda), owl/gate.py (tabla D10, costo `reported`/`owl_estimate`), variants/gentle-ai.yaml y placebo.yaml, artifacts de navori/superpowers estrechados, specs/f3-ronda1 (cost-validation, spike-gentle-ai, artifacts-audit, tasks, design), tests.
+- Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 185 passed; docker gentle_ai y artifacts_excluded verdes (reviewer Pass 2, APPROVED en ambos lotes).
+- Notas: estimador de costo reproduce los 24 trials del piloto (error máx 2.46e-16). Deuda: T16 debe pasar `round_def` desde `check_jobs`; T21 confirma subtipos `error_max_*`, qué escribe el `claude` real de gentle-ai y los huecos `progress/` y `specs/*.md.draft` de navori; `Round.load` sin validar claves de límites (T23); `cost_source=harbor` solo codex. `owl validate --suite` completo tarda ~25 min (no se cuelga) y `21-overeng-csv-export` falla estático por `.DS_Store` locales en `tasks/*/tests/` (borrarlos antes de T22). Los MEDIO del review del lote 3 (redacción del comentario de telemetría, alinear spike §11, aserción del caso negativo en test_validate_docker, fila de veredicto de `.superpowers/`, test de una fila por prefijo) quedan para T22/T23.
+- Commit / PR: branch feat/f3-lote1
+
 ## 2026-09-29 22:19 orchestrator — F3 lote 0/1 y T18: piloto aplicado, ronda, variantes, harness, verifier y análisis
 - Cambios: `owl/round.py` (T3), `owl/variants.py` + `owl/validate.py` + `variants/{navori,superpowers}.yaml` (T4, chequeo `artifacts_clear`), `owl/agents/claude_code_harness.py` (T5, `install()` con los pasos del harness, `artifacts`, `OWL_CLAUDE_CONFIG_DIR`), `owl/verifier/lib.sh` + 13 copias `owl-lib.sh` (T6, `changes.tsv`), `owl/analysis.py` (T18), `scope.allow` de las tareas 10–15 (T1), `specs/f3-ronda1/indicators.md` (T2), `docs/task-authoring.md`, `docs/research/08-terminal-bench-y-harbor.md`.
 - Quality gate: ✅ `ruff check .` verde y 153 pruebas (`-m 'not docker'`); pruebas Docker de T5/T6 en verde; `owl validate --suite` 12/12 PASS (reviewer, APPROVED sin CRÍTICO ni ALTO).

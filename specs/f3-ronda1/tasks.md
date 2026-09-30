@@ -146,7 +146,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
 
 ## Lote 3 — Variantes nuevas y auditoría de artefactos
 
-- [ ] **T11** (R6) — Spike de gentle-ai, gratis y sin modelo, en `owl-patient:local` como `node`: descarga y
+- [x] **T11** (R6) — Spike de gentle-ai, gratis y sin modelo, en `owl-patient:local` como `node`: descarga y
   verifica `v3.7.0`, corre `gentle-ai install --agent claude-code --preset full-gentleman --scope
   workspace --dry-run` desde `/app` y luego la instalación real con `GENTLE_AI_TELEMETRY=0`; lista cada
   archivo escrito en `/app` y en `$HOME`; confirma que los hooks quedan en `/app/.claude/settings.json`;
@@ -156,7 +156,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   privilegios pedidos, versión de engram, persona, modo SDD y RDD resultantes y las rutas de artefactos más
   estrechas. Resultado: `specs/f3-ronda1/spike-gentle-ai.md` · test: evidencia (comando, salida) en
   `spike-gentle-ai.md`; las pruebas de código llegan en T12.
-- [ ] **T12** (R6, R9) — `variants/gentle-ai.yaml`: `init` con la receta fijada (binario + checksum, engram
+- [x] **T12** (R6, R9) — `variants/gentle-ai.yaml`: `init` con la receta fijada (binario + checksum, engram
   si hace falta, `export GENTLE_AI_TELEMETRY=0`, `gentle-ai install` con las flags de D3, puente si T11 lo
   exige usando `$OWL_CLAUDE_CONFIG_DIR`), centinela de D3 con exit 1, `harness.env:
   {GENTLE_AI_TELEMETRY: "0"}` (run), `expect` según T11, `artifacts` (`odd/` más lo de T11, con
@@ -164,10 +164,10 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   `tests/test_validate_docker.py::test_gentle_ai_install_on_patient` (`-m docker`, sin modelo),
   `tests/test_variants.py::test_gentle_ai_declares_artifacts` y
   `::test_gentle_ai_telemetry_off_in_install_and_run`, con `# Covers: R6, R9`.
-- [ ] **T13** (R7) — `variants/placebo.yaml`: `vanilla-default` + `harness.append_system_prompt: "Keep
+- [x] **T13** (R7) — `variants/placebo.yaml`: `vanilla-default` + `harness.append_system_prompt: "Keep
   changes minimal and verify your work."`, `expect: {plugins: [], mcp_servers: []}` · test:
   `tests/test_variants.py::test_placebo_command_appends_system_prompt`, `# Covers: R7`.
-- [ ] **T14** (R9) — Auditoría de artefactos por un `auditor` en contexto fresco que no escribió los
+- [x] **T14** (R9) — Auditoría de artefactos por un `auditor` en contexto fresco que no escribió los
   manifiestos: para cada prefijo de `navori`, `superpowers` y `gentle-ai` (incluidos los del spike), la
   ruta en la fuente fijada que muestra que el flujo documentado escribe ahí, que es el directorio más
   estrecho posible, que no es estado propio del harness, que no es una raíz compartida (`.claude/`,
