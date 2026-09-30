@@ -177,6 +177,28 @@ def _classify_failure(gate: TrialGate, name: str, has_result: bool, events: list
         _fail(gate, f"trial exception: {name}{suffix}", "infra", "other")
 
 
+def _mcp_connected_later(trial_dir: Path, server: str) -> bool:
+    """True when the session transcript shows ``server`` connected after init.
+
+    Signal: a ``deferred_tools_delta`` attachment whose ``addedNames`` lists ``mcp__<server>__*``
+    tools. Claude Code adds a server's tools only once it connects (real gentle-ai trial: context7,
+    an npx/stdio server, pending at init, tools added ~6 s later with ``pendingMcpServers: []``).
+    A server that never connects never adds tools, so it stays contamination.
+    """
+    prefix = f"mcp__{server}__"
+    for path in sorted((trial_dir / "agent" / "sessions" / "projects").rglob("*.jsonl")):
+        for line in path.read_text(errors="replace").splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            attachment = record.get("attachment") if isinstance(record, dict) else None
+            is_delta = isinstance(attachment, dict) and attachment.get("type") == "deferred_tools_delta"
+            if is_delta and any(str(n).startswith(prefix) for n in attachment.get("addedNames") or []):
+                return True
+    return False
+
+
 def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict, stall_minutes: float) -> None:
     log = trial_dir / "agent" / "claude-code.txt"
     exc = gate.exception_type
@@ -242,10 +264,19 @@ def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict, stall_mi
             wanted = sorted(expect.get(key) or [])
             if actual != wanted:
                 _fail(gate, f"{key}: expected {wanted}, loaded {actual}", "contamination")
+        declared_mcp = set(expect.get("mcp_servers") or [])
         for server in mcp_servers:
-            status = server.get("status")
-            if status != "connected":
-                _fail(gate, f"mcp server {server.get('name', '?')}: status {status}", "contamination")
+            status, name = server.get("status"), server.get("name", "?")
+            if status == "connected":
+                continue
+            if status == "pending" and name in declared_mcp:
+                if _mcp_connected_later(trial_dir, name):
+                    continue
+                _fail(gate, f"mcp server {name}: pending at init and never connected in the session", "contamination")
+            elif status == "pending":
+                _fail(gate, f"mcp server {name}: pending at init and not declared in expect.mcp_servers", "contamination")
+            else:
+                _fail(gate, f"mcp server {name}: status {status}", "contamination")
         for key in ("plugin_errors", "mcp_server_errors"):
             if init.get(key):
                 _fail(gate, f"{key}: {init[key]}", "contamination")

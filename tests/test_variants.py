@@ -103,3 +103,9 @@ def test_gentle_ai_telemetry_off_in_install_and_run() -> None:
     assert "--agent claude-code --preset full-gentleman --scope workspace" in lines[install]
     assert "--persona" not in lines[install] and "--sdd-mode" not in lines[install]
     assert 'export CLAUDE_CONFIG_DIR="$OWL_CLAUDE_CONFIG_DIR"' in lines
+
+
+# Covers: R6
+def test_gentle_ai_expect_matches_real_install() -> None:
+    v = Variant.load("gentle-ai")
+    assert v.expect == {"plugins": ["engram"], "mcp_servers": ["context7", "engram"]}

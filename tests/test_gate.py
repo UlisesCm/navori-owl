@@ -372,3 +372,46 @@ def test_round_conformance_flags_mismatched_max_turns_and_budget(tmp_path: Path)
     assert gate.category == "contamination"
     assert any("max_turns expected '300', recorded '2'" in r for r in gate.reasons)
     assert any("max_budget_usd" in r for r in gate.reasons)
+
+
+# ---------------------------------------------------------------------------
+# Pending MCP servers (R13)
+# ---------------------------------------------------------------------------
+
+_PENDING_VARIANT = {"id": "v", "agent": "claude-code", "expect": {"plugins": [], "mcp_servers": ["context7"]}}
+
+
+def _mcp_trial(tmp_path: Path, status: str, connected_later: bool) -> Path:
+    init = {**INIT, "mcp_servers": [{"name": "context7", "status": status}]}
+    trial = _trial(tmp_path, [init, _result()])
+    names = ["mcp__context7__query-docs"] if connected_later else ["Bash"]
+    delta = {"type": "attachment", "attachment": {"type": "deferred_tools_delta", "addedNames": names}}
+    sessions = trial / "agent" / "sessions" / "projects" / "-app"
+    sessions.mkdir(parents=True)
+    (sessions / "s.jsonl").write_text(json.dumps(delta) + "\n")
+    return trial
+
+
+def test_pending_mcp_connected_later_is_ok(tmp_path: Path) -> None:
+    """Covers: R13"""
+    gate = check_trial(_mcp_trial(tmp_path, "pending", True), _PENDING_VARIANT)
+    assert gate.passed is True and gate.category == "ok"
+
+
+def test_pending_mcp_never_connected_is_contamination(tmp_path: Path) -> None:
+    """Covers: R13"""
+    gate = check_trial(_mcp_trial(tmp_path, "pending", False), _PENDING_VARIANT)
+    assert gate.category == "contamination" and "never connected" in gate.reasons[0]
+
+
+def test_pending_mcp_undeclared_is_contamination(tmp_path: Path) -> None:
+    """Covers: R13"""
+    variant = {**_PENDING_VARIANT, "expect": {"plugins": [], "mcp_servers": []}}
+    gate = check_trial(_mcp_trial(tmp_path, "pending", True), variant)
+    assert gate.category == "contamination" and any("not declared" in r for r in gate.reasons)
+
+
+def test_failed_mcp_stays_contamination_even_with_pending_rule(tmp_path: Path) -> None:
+    """Covers: R13 (pending rule does not soften failed)"""
+    gate = check_trial(_mcp_trial(tmp_path, "failed", True), _PENDING_VARIANT)
+    assert gate.category == "contamination" and "status failed" in gate.reasons[0]
