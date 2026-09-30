@@ -558,3 +558,54 @@ def test_authoring_doc_does_not_leak_the_dev_catalog() -> None:
         "incident", "backup", "injected clock", "combined filter", "daily stat", "tasks/1", "tasks/2",
     ]
     assert [term for term in forbidden if term in text] == []
+
+
+# --- artifacts_clear (R8, D13) --------------------------------------------------------------
+
+
+@pytest.fixture
+def artifact_prefix(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    import owl.validate as validate_module
+
+    variants_dir = tmp_path / "variants-fixture"
+    variants_dir.mkdir()
+    (variants_dir / "x.yaml").write_text("id: x\nharness:\n  artifacts:\n    - notes/\n")
+    monkeypatch.setattr(validate_module, "VARIANTS_DIR", variants_dir)
+    return "notes/"
+
+
+# Covers: R8
+def test_artifacts_clear_fails_on_fixture_under_prefix(tmp_path: Path, artifact_prefix: str) -> None:
+    task_dir = _write_fixture_task(tmp_path)
+    assert static_checks(task_dir)["artifacts_clear"][0]
+    (task_dir / "environment" / "app" / "notes").mkdir(parents=True)
+    (task_dir / "environment" / "app" / "notes" / "todo.md").write_text("x")
+    assert not static_checks(task_dir)["artifacts_clear"][0]
+
+
+# Covers: R8
+@pytest.mark.parametrize("line", ["+++ b/notes/x.md", "cp x /app/notes/x.md", "'notes/x.md'", "notes/x.md"])
+def test_artifacts_clear_fails_on_path_named_in_patch_or_script(tmp_path: Path, artifact_prefix: str, line: str) -> None:
+    task_dir = _write_fixture_task(tmp_path)
+    (task_dir / "environment" / "seed.sh").write_text(line + "\n")
+    assert not static_checks(task_dir)["artifacts_clear"][0]
+    (task_dir / "environment" / "seed.sh").write_text("cat footnotes/x.md\n")
+    assert static_checks(task_dir)["artifacts_clear"][0]
+
+
+# Covers: R8
+def test_artifacts_clear_holdout_reports_name_only(tmp_path: Path, artifact_prefix: str) -> None:
+    task_dir = _write_fixture_task(tmp_path / "holdout", name="30-security-x", owl_holdout=True)
+    (task_dir / "environment" / "seed.sh").write_text("cp x /app/notes/secret-name.md\n")
+    entry = validate_task(task_dir, tmp_path, ["static"], [], holdout=True)
+    assert entry["static"]["reasons"] == ["artifacts_clear"]
+    assert "secret-name" not in json.dumps(entry)
+
+
+# Covers: R8
+def test_artifacts_clear_passes_dev_suite() -> None:
+
+    root = Path(__file__).resolve().parent.parent / "tasks"
+    for task_dir in sorted(p for p in root.iterdir() if (p / "task.toml").is_file()):
+        ok, reason = static_checks(task_dir)["artifacts_clear"]
+        assert ok, f"{task_dir.name}: {reason}"

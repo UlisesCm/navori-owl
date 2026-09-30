@@ -91,14 +91,15 @@
 # NOT in this list even though EPHEMERAL_HARNESS_PATHS has it: navori's hooks never
 # write it at runtime (it's hand-edited, per-user config, not harness-generated
 # operational state), so if it changes during a trial, an agent wrote it, and that
-# must count as out of scope like any other edit. The remaining 4 entries pass the
+# must count as out of scope like any other edit. The remaining 3 entries pass the
 # rule: `.claude/.managed-drift-stamp` and `.claude/.routing-watch/` are pure hook
 # timing/session marks (confirmed reading the hooks — timestamps and per-session
-# counters, nothing that changes agent permissions or config); `.claude/progress/`
-# and `.claude/worktrees/` are operational byproducts the harness's own
-# orchestrator/subagent-handoff and parallel-worktree machinery create and manage
-# as part of running a session, not user-authored config an agent could turn into
-# a privilege-escalation vector. `.codex/progress/` is omitted regardless: this
+# counters, nothing that changes agent permissions or config); `.claude/worktrees/`
+# is an operational byproduct of the harness's parallel-worktree machinery, not
+# user-authored config an agent could turn into a privilege-escalation vector.
+# F3 (R9): `.claude/progress/` moved out of runtime_state into `harness.artifacts`
+# (plans and handoff notes the workflow asks the agent to write, so exempt from
+# scope/reward, but declared as agent output rather than harness-written state). `.codex/progress/` is omitted regardless: this
 # variant never renders the Codex engine.
 id: navori
 description: navori-harness instalado por su propio installer (npx), pineado a 0.10.0, con engram instalado desde su release pineado.
@@ -140,11 +141,15 @@ harness:
     # line every patient revision carries right after the intro paragraph.
     grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/CLAUDE.md || { echo "navori: base CLAUDE.md content missing after init+render" >&2; exit 1; }
     grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/AGENTS.md || { echo "navori: base AGENTS.md content missing after init+render" >&2; exit 1; }
+  # source: navori@0.10.0 subagent-handoff/orchestrator hooks write session progress
+  # notes under .claude/progress/ (plans and handoffs): agent-facing artifacts, not
+  # state the harness writes by itself.
+  artifacts:
+    - ".claude/progress/"
   runtime_state:
     - ".claude/.managed-drift-stamp"
     - ".claude/.routing-watch/"
     - ".claude/worktrees/"
-    - ".claude/progress/"
 expect:
   plugins: []
   mcp_servers: [engram]

@@ -3,3 +3,4 @@
 # refs/owl/baseline) that matches none of these counts as out of scope.
 packages/cli/src/commands.ts
 CHANGELOG.md
+packages/cli/test/*

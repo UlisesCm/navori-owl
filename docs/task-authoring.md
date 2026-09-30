@@ -397,7 +397,7 @@ Qué comprueba:
 **Estáticos** (sin Docker), nombres exactos de los checks:
 
 <!-- owl-doc:static_checks -->
-`canary`, `lib_identity`, `reward_subset`, `required_files`, `metadata`, `category`, `holdout_coherence`
+`canary`, `lib_identity`, `reward_subset`, `required_files`, `metadata`, `category`, `holdout_coherence`, `artifacts_clear`
 <!-- /owl-doc:static_checks -->
 
 - `canary`: el GUID está en cada archivo de la sección 8.
@@ -411,6 +411,9 @@ Qué comprueba:
 - `metadata`: `owl_dimensions` y `owl_reward` no vacíos y, en tareas de suite, `owl_target_dimension` presente.
 - `category`: `owl_type` es una categoría de la sección 10.
 - `holdout_coherence`: la ruta (`holdout/`) y `owl_holdout` coinciden.
+- `artifacts_clear`: ningún archivo de `environment/` está bajo un prefijo `artifacts` de `variants/*.yaml`
+  ni nombra una ruta bajo uno (el paciente no debe ocultar ni depender de lo que una variante escribe).
+  En el holdout el reporte trae solo el nombre del chequeo.
 - Sin `task.toml`, el único check es `task_toml` y falla.
 
 **Dinámicos** (Harbor, sin modelo):

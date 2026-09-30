@@ -5,3 +5,4 @@
 # Unreleased entry).
 packages/db/src/incidents-repo.ts
 CHANGELOG.md
+packages/db/test/*

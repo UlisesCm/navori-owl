@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** F2 cerrada (T0–T17). Siguiente: F3 — Ronda 1 con SDD (`specs/f3-ronda1/`, en revisión tras el challenge; decisiones del usuario: endpoints costo + comportamiento, placebo de una línea, gentle-ai con defaults, concurrencia 2, tope $250). El lote 0 de F3 aplica los ajustes de `specs/f2-suite-v1/pilot.md`.
+**Estado:** F3 en curso (`specs/f3-ronda1/`, spec rev. 3 aprobado). Lote 0/1 y T18 (T1-T6, T18) implementados y aprobados en `feat/f3-lote1`; `owl validate --suite` 12/12. Investigación de Terminal-Bench y Harbor completa en `docs/research/08-terminal-bench-y-harbor.md`. **Decisiones pendientes antes de T22/T23:** (1) cerrar el hueco del verifier `node --test` (RH1+RH3+RH4, un solo cambio de `lib.sh`, primero probar el ataque `import-payload` en Docker con Node 22); (2) cuáles candidatas A-I / RH2 / H1-H3 entran a F3 (H1 `HARBOR_TELEMETRY=0` es una línea); (3) arreglar `VISION.md:173` (red). Siguiente en el plan: lotes 2 y 3 (T7-T14, en paralelo).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
