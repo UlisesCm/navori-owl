@@ -72,6 +72,8 @@ class TrialGate:
     cost_source: str | None = None
     # rate_limit_event records with status allowed_warning: counted, never an exclusion (R17).
     rate_limit_warnings: int = 0
+    # ``resetsAt`` (epoch seconds) of the rejected rate_limit_event, when the transcript reports it.
+    resets_at: int | None = None
 
 
 def _fail(gate: TrialGate, reason: str, category: str, infra_reason: str | None = None) -> None:
@@ -189,11 +191,12 @@ def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict, stall_mi
 
     # Signal 1 (circuit breaker): rate-limit events. Only ``rejected`` excludes; warnings are counted.
     for event in (e for e in events if e.get("type") == "rate_limit_event"):
-        status = (event.get("rate_limit_info") or {}).get("status")
-        if status == "allowed_warning":
+        info = event.get("rate_limit_info") or {}
+        if info.get("status") == "allowed_warning":
             gate.rate_limit_warnings += 1
-        elif status == "rejected":
+        elif info.get("status") == "rejected":
             _fail(gate, "rate_limit_event rejected", "infra", "usage_limit")
+            gate.resets_at = info.get("resetsAt")
 
     limit_from_result = False
     if result is not None:
@@ -456,27 +459,28 @@ def check_trial(trial_dir: Path, variant: dict, round_def: Round | None = None) 
     return gate
 
 
-def check_jobs(jobs_dir: Path) -> list[TrialGate]:
-    gates = []
-    for manifest in sorted(jobs_dir.glob("*/owl-variant.json")):
-        variant = json.loads(manifest.read_text())
-        trial_dirs = sorted(p for p in manifest.parent.iterdir() if (p / "config.json").is_file())
-        if not trial_dirs:
-            code = variant.get("harbor_exit_code", "unknown")
-            gates.append(
-                TrialGate(
-                    trial=manifest.parent.name,
-                    variant=variant["id"],
-                    passed=False,
-                    reasons=[f"no trial: harbor exited with {code}"],
-                    category="infra",
-                    infra_reason="setup",
-                )
+def check_job(job_dir: Path, round_def: Round | None = None) -> list[TrialGate]:
+    """Gate the trials of one job dir (its ``owl-variant.json`` names the variant)."""
+    variant = json.loads((job_dir / "owl-variant.json").read_text())
+    trial_dirs = sorted(p for p in job_dir.iterdir() if (p / "config.json").is_file())
+    if not trial_dirs:
+        code = variant.get("harbor_exit_code", "unknown")
+        return [
+            TrialGate(
+                trial=job_dir.name,
+                variant=variant["id"],
+                passed=False,
+                reasons=[f"no trial: harbor exited with {code}"],
+                category="infra",
+                infra_reason="setup",
             )
-            continue
-        for trial_dir in trial_dirs:
-            gates.append(check_trial(trial_dir, variant))
-    return gates
+        ]
+    return [check_trial(trial_dir, variant, round_def) for trial_dir in trial_dirs]
+
+
+def check_jobs(jobs_dir: Path, round_def: Round | None = None) -> list[TrialGate]:
+    """Gate every job under ``jobs_dir``; ``round_def`` enables the round-only checks per trial."""
+    return [g for manifest in sorted(jobs_dir.glob("*/owl-variant.json")) for g in check_job(manifest.parent, round_def)]
 
 
 def write_report(gates: list[TrialGate], out: Path) -> None:
