@@ -74,6 +74,8 @@ class TrialGate:
     rate_limit_warnings: int = 0
     # ``resetsAt`` (epoch seconds) of the rejected rate_limit_event, when the transcript reports it.
     resets_at: int | None = None
+    # True when the agent log has a ``result`` event (claude-code) or a ``turn.completed`` (codex).
+    result_event: bool = False
 
 
 def _fail(gate: TrialGate, reason: str, category: str, infra_reason: str | None = None) -> None:
@@ -199,6 +201,7 @@ def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict, stall_mi
             gate.resets_at = info.get("resetsAt")
 
     limit_from_result = False
+    gate.result_event = result is not None
     if result is not None:
         gate.cost_usd = result.get("total_cost_usd")
         if gate.cost_usd is not None:
@@ -280,6 +283,7 @@ def _check_codex(gate: TrialGate, trial_dir: Path, variant: dict, stall_minutes:
         _fail(gate, "no turn.completed event: run did not finish", "infra", "other")
         return
 
+    gate.result_event = True
     gate.num_turns = len(completed)
     usage = completed[-1].get("usage") or {}
     tokens = sum(v for v in usage.values() if isinstance(v, (int, float)))

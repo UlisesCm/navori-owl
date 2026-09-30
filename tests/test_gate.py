@@ -347,3 +347,15 @@ def test_harbor_cost_kept_for_codex(tmp_path: Path) -> None:
     (trial / "result.json").write_text(json.dumps({"agent_result": {"cost_usd": 0.42}}))
     gate = check_trial(trial, {"id": "codex-default", "agent": "codex"})
     assert gate.cost_usd == 0.42
+
+
+def test_result_event_flag(tmp_path: Path) -> None:
+    """Covers: R22"""
+    with_result = _make_trial(tmp_path, {"reward": 1})
+    assert check_trial(with_result, VARIANT).result_event is True
+
+    no_result = tmp_path / "trial-1"
+    (no_result / "agent").mkdir(parents=True)
+    init = {"type": "system", "subtype": "init", "plugins": [], "mcp_servers": []}
+    (no_result / "agent" / "claude-code.txt").write_text(json.dumps(init) + "\n")
+    assert check_trial(no_result, VARIANT).result_event is False

@@ -208,7 +208,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   10 con Holm y la simulación de cobertura con el proceso generador de D12 (costo, éxito con techo,
   comportamiento escaso; ≥ 0.88 en cada escenario; fracción de degenerados informada),
   `# Covers: R26, R27, R28, R29`.
-- [ ] **T19** (R22, R23, R24, R29, R30, R31, R33, R38) — Política de exclusión única en
+- [x] **T19** (R22, R23, R24, R29, R30, R31, R33, R38) — Política de exclusión única en
   `owl/summary.py::_exclusion` (D11, `tampered` como fracaso) y `n/a` en `f2p` fuera del reward (ajuste 6
   del piloto); `owl report --round DIR`: `scope_violation` con la excepción "solo notas" y `test_weakened`
   desde `changes.tsv`, compuesto con la tabla de T2 y la regla de familias, conformidad, §11.6 por
@@ -223,7 +223,7 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
   `.md` existente modificado viola; éxito al lado de cada línea; conteos en lugar de intervalo degenerado;
   `vs_placebo` sin p) y `tests/test_summary.py` actualizado (`tampered`, `n/a`), con
   `# Covers: R22, R23, R24, R29, R30, R31, R33, R38`.
-- [ ] **T20** (R34, R36) — Lista de revisión de fallas (celdas con fallas, límites y `tampered`, con ruta del
+- [x] **T20** (R34, R36) — Lista de revisión de fallas (celdas con fallas, límites y `tampered`, con ruta del
   transcript) y sección holdout (solo con `--holdout`, descriptiva, sin p-values, "sin calibrar", fuera del
   primario) · test: `tests/test_report.py::test_failure_checklist`, `::test_holdout_refused_without_flag`,
   `::test_holdout_section_descriptive_only`, con `# Covers: R34, R36`.
