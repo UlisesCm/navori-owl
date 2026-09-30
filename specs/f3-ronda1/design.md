@@ -176,7 +176,7 @@ falla, el `init` preinstala engram con la receta de `navori.yaml` en la versión
 línea `opsdesk-conventions-sentinel-f96c2e` intacta en `CLAUDE.md` y `AGENTS.md`, y, si hubo puente, lo
 copiado en `$OWL_CLAUDE_CONFIG_DIR`.
 
-**Gate.** `expect.mcp_servers` según el spike (se esperan engram y Context7), `expect.plugins: []`.
+**Gate.** `expect.plugins: [engram]` y `expect.mcp_servers: [context7, engram]` (confirmado por el smoke de T21: el componente engram del preset `full-gentleman` corre `claude plugin install` y `claude mcp add --scope user`; context7 viene de `.mcp.json`).
 
 **Artefactos.** El flujo ODD escribe `odd/tasks/<feature>.md` (`docs/usage.md` en `v3.7.0`) →
 `artifacts: ["odd/"]`, más lo que el spike encuentre, cada uno con su fuente (R9, auditoría T14).
@@ -345,6 +345,7 @@ sola fuente) y se aplica igual al `exception_type` de `result.json` que al texto
   (re-check NOTE-B; vanilla: 20 s en el piloto contra 5 min de umbral).
 - `TrialGate` gana `limit_hit`, `exception_type`, `infra_reason`, `cost_source` y `rate_limit_warnings`;
   un trial válido queda `passed = True` y se cuenta con su reward.
+- **MCP `pending` en el init (smoke de T21):** un servidor `pending` se acepta solo si está en `expect.mcp_servers` y el transcript de sesión lo muestra conectado después (un `deferred_tools_delta` que agrega sus herramientas `mcp__<servidor>__*`); cualquier otro estado distinto de `connected`, o un `pending` que nunca conecta o no está declarado, sigue siendo `contamination`.
 
 **Costo (R25, challenge C4, re-check NEW-3).** Orden: `total_cost_usd` del evento `result`
 (`cost_source = reported`); si no hay, owl estima desde los transcripts de sesión

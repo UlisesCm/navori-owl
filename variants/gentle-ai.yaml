@@ -105,7 +105,8 @@ harness:
   # agent output (spike T11 §4, §12).
   runtime_state:
     - ".atl/"
-# Provisional, see "TO CONFIRM IN T21": .mcp.json only declares context7.
+# source: T21 smoke: the engram component of preset full-gentleman runs `claude plugin install`
+# (plugin engram) and `claude mcp add --scope user` (server engram); .mcp.json adds context7.
 expect:
-  plugins: []
-  mcp_servers: [context7]
+  plugins: [engram]
+  mcp_servers: [context7, engram]
