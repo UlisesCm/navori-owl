@@ -90,3 +90,19 @@ Las tareas esperadas en 2/2 (10 trivial; 18 repro; 20 comportamiento) y los bugf
 
 Observación: con Beta(2,2) se esperan ~60% de tareas marcadas a k=2; aquí salieron 11 de 12 (92%). Es mucho por encima; coherente con el techo de Haiku (tareas fáciles) y con que 3 de los 0/2 son fallos honestos, pero no cambia la regla: k=2 no mide dificultad.
 
+
+### Ajustes aplicados en F3 (T1, `specs/f3-ronda1/`)
+
+Lista final de tareas dev de la suite: 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 y 21 (más `00-smoke`, que
+no es tarea de suite). Solo cambió `tests/scope.allow` en seis; ningún `owl_reward` de un `task.toml` cambió.
+
+| Ajuste | Tarea | Cambio |
+|---|---|---|
+| 1 | 11, 12 | + `packages/db/test/*` |
+| 1 | 13 | + `packages/core/test/*` |
+| 2 | 10 | + `packages/cli/test/*` |
+| 2 | 15 | + `packages/api/test/*`, `packages/db/test/*` |
+| 5 | 14 | `packages/core/src/tag.ts` → `packages/core/src/tag*.ts`; `packages/db/migrations/0003_tags.sql` → `packages/db/migrations/*.sql` |
+
+Los ajustes 3 y 4 no tocan tareas: el 3 pasa a `indicators.md` (T2) y a `RULES.md` (T23), el 4 a `RULES.md`.
+El 6 (`n/a` en `f2p` fuera del reward) queda para T19.

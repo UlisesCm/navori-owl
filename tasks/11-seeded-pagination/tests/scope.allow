@@ -3,3 +3,4 @@
 # refs/owl/baseline) that matches none of these counts as out of scope.
 packages/db/src/incidents-repo.ts
 CHANGELOG.md
+packages/db/test/*

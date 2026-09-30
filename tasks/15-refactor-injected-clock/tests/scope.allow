@@ -7,3 +7,5 @@ packages/api/src/**
 packages/db/src/**
 packages/core/src/**
 CHANGELOG.md
+packages/api/test/*
+packages/db/test/*

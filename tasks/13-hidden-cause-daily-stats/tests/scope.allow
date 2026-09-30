@@ -6,3 +6,4 @@
 # blames.
 packages/core/src/time.ts
 CHANGELOG.md
+packages/core/test/*
