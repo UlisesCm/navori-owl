@@ -160,6 +160,28 @@ def test_holdout_refused_without_flag_exit_2(tmp_path: Path, capsys: pytest.Capt
     assert cmd_summary(args) == 0
 
 
+# Covers: R15
+def test_holdout_job_without_trial_refused_without_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    holdout = tmp_path / "holdout"
+    (holdout / "h1").mkdir(parents=True)
+    monkeypatch.setattr("owl.summary.HOLDOUT_DIR", holdout)
+    jobs = tmp_path / "jobs"
+    job = jobs / "20260101-000000__h1__v1__r1"  # harbor failed before producing a trial
+    job.mkdir(parents=True)
+    (job / "owl-variant.json").write_text(json.dumps(_variant("v1")))
+    args = argparse.Namespace(jobs_dir=[str(jobs)], json=None, holdout=False)
+
+    with pytest.raises(SystemExit) as exc:
+        cmd_summary(args)
+
+    assert exc.value.code == 2
+    assert str(holdout / "h1") in capsys.readouterr().err
+    args.holdout = True
+    assert cmd_summary(args) == 0
+
+
 # Covers: R14, R15
 def test_unresolvable_task_refused_fail_closed(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _trial(tmp_path, "t", "v1", 1, {"reward": 1})

@@ -33,12 +33,17 @@ class Cell:
     tampered: int = 0  # kept trials whose baseline the agent moved: failures, listed apart (D11)
 
 
-def _task_name(gate: TrialGate) -> str:
+def task_name(gate: TrialGate) -> str:
     """Task of a trial: its config's task dir name, else the ``stamp__task__variant__rN`` job name."""
     if gate.task_path:
         return Path(gate.task_path).name
-    parts = gate.trial.split("__")
-    return parts[1] if len(parts) >= 4 else gate.trial
+    return _task_of_job_name(gate.trial)
+
+
+def _task_of_job_name(name: str) -> str:
+    """Task segment of a ``stamp__task__variant__rN`` name, else the name itself."""
+    parts = name.split("__")
+    return parts[1] if len(parts) >= 4 else name
 
 
 def _mean(values: list[float]) -> float | None:
@@ -70,7 +75,7 @@ def is_tampered(gate: TrialGate) -> bool:
     )
 
 
-def _exclusion(gate: TrialGate) -> str | None:
+def exclusion(gate: TrialGate) -> str | None:
     """Category a trial is excluded under, or None when it is a kept trial (R22).
 
     ``infra`` and ``contamination`` are excluded, except a ``tampered`` trial (`is_tampered`), which is
@@ -98,14 +103,14 @@ def summarize(gates: list[TrialGate]) -> list[Cell]:
     """Aggregate gated trials into one `Cell` per (task, variant), sorted by task then variant."""
     groups: dict[tuple[str, str], list[TrialGate]] = defaultdict(list)
     for gate in gates:
-        groups[(_task_name(gate), gate.variant)].append(gate)
+        groups[(task_name(gate), gate.variant)].append(gate)
 
     cells = []
     for (task, variant), members in sorted(groups.items()):
         cell = Cell(task=task, variant=variant)
         valid = []
         for gate in members:
-            category = _exclusion(gate)
+            category = exclusion(gate)
             if category is None:
                 valid.append(gate)
                 cell.tampered += is_tampered(gate)
@@ -162,13 +167,12 @@ def _holdout_ref_of(task_path: str | None, trial: str, no_trial: bool) -> str | 
     if task_path:
         return task_path if is_holdout(Path(task_path)) else None
     if no_trial:
-        parts = trial.split("__")
-        candidate = HOLDOUT_DIR / (parts[1] if len(parts) >= 4 else trial)
+        candidate = HOLDOUT_DIR / _task_of_job_name(trial)
         return str(candidate) if candidate.is_dir() else None
     return f"unresolved: {trial}"
 
 
-def _holdout_ref(gate: TrialGate) -> str | None:
+def holdout_ref(gate: TrialGate) -> str | None:
     """`_holdout_ref_of` for an already gated trial."""
     return _holdout_ref_of(gate.task_path, gate.trial, bool(gate.reasons) and gate.reasons[0].startswith("no trial:"))
 
