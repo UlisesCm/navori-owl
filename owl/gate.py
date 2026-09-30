@@ -377,7 +377,7 @@ def _check_round_conformance(gate: TrialGate, trial_dir: Path, variant: dict, ro
         _fail(gate, "round conformance: config.json unreadable", "contamination")
         return
     kwargs = agent.get("kwargs") or {}
-    raw = round_def.raw
+    limits = round_def.limits
 
     def strip(model: object) -> str:
         return str(model).removeprefix("anthropic/")
@@ -387,10 +387,9 @@ def _check_round_conformance(gate: TrialGate, trial_dir: Path, variant: dict, ro
         ("version", round_def.agent_version, str(kwargs.get("version"))),
         ("append_system_prompt", (variant.get("harness") or {}).get("append_system_prompt"), kwargs.get("append_system_prompt")),
     ]
-    if "max_turns" in raw:
-        checks.append(("max_turns", str(raw["max_turns"]), str(kwargs.get("max_turns"))))
-    if "max_budget_usd" in raw:
-        checks.append(("max_budget_usd", str(raw["max_budget_usd"]), str(kwargs.get("max_budget_usd"))))
+    # Harbor's trial config.json does not record the timeout multipliers: only these two are comparable.
+    checks.append(("max_turns", str(limits["max_turns"]), str(kwargs.get("max_turns"))))
+    checks.append(("max_budget_usd", str(limits["max_budget_usd"]), str(kwargs.get("max_budget_usd"))))
     if round_def.artifacts:
         got = kwargs.get("artifacts")
         got_list = got.split(",") if isinstance(got, str) else list(got or [])

@@ -35,6 +35,12 @@ def env(tmp_path, monkeypatch):
     return root
 
 
+LIMITS = {
+    "agent_timeout_multiplier": 3.0, "agent_setup_timeout_multiplier": 2.0,
+    "max_turns": 300, "max_budget_usd": "5.00",
+}
+
+
 def _write_round(root: Path, **over) -> Path:
     data = {
         "id": "r1",
@@ -44,6 +50,7 @@ def _write_round(root: Path, **over) -> Path:
         "placebo": "b",
         "tasks": ["tasks/t1"],
         "prices_usd_per_mtok": dict(PRICES),
+        "limits": dict(LIMITS),
     }
     data.update(over)
     rdir = root / "rounds" / "r1"
@@ -234,7 +241,8 @@ class FakeHarbor:
         (trial / "verifier").mkdir()
         (trial / "config.json").write_text(json.dumps({
             "task": {"path": "x"},
-            "agent": {"model_name": "claude-haiku", "kwargs": {"version": "1.0", "artifacts": ".claude/,.b/"}},
+            "agent": {"model_name": "claude-haiku", "kwargs": {"version": "1.0", "artifacts": ".claude/,.b/",
+                                              "max_turns": 300, "max_budget_usd": "5.00"}},
         }))
         user = {"type": "user", "message": {"role": "user", "content": "fix\n\nWork unattended."}}
         (trial / "agent" / "sessions" / "projects" / "-app" / "s.jsonl").write_text(json.dumps(user) + "\n")
@@ -443,3 +451,52 @@ def test_run_without_variant_or_round_exits_2(capsys):
     with pytest.raises(SystemExit) as exc:
         cmd_run(Namespace(round=None, variant=None))
     assert exc.value.code == 2 and "--variant" in capsys.readouterr().err
+
+
+def _write_raw_round(env, **over) -> Path:
+    """Write a round.yaml, dropping keys whose override is None."""
+    rdir = _write_round(env)
+    data = yaml.safe_load((rdir / "round.yaml").read_text())
+    data.update(over)
+    (rdir / "round.yaml").write_text(yaml.safe_dump({k: v for k, v in data.items() if v is not None}))
+    return rdir
+
+
+# Covers: R11, R13, R20
+def test_load_exposes_limits(env):
+    assert rnd.Round.load(_write_round(env), root=env).limits == LIMITS
+
+
+# Covers: R11, R13, R20
+def test_load_rejects_missing_limits(env):
+    with pytest.raises(SystemExit, match="limits"):
+        rnd.Round.load(_write_raw_round(env, limits=None), root=env)
+
+
+# Covers: R11, R13, R20
+def test_load_rejects_top_level_limits(env):
+    rdir = _write_raw_round(env, limits=None, **LIMITS)
+    with pytest.raises(SystemExit, match="nest them under 'limits'"):
+        rnd.Round.load(rdir, root=env)
+
+
+# Covers: R11, R13, R20
+@pytest.mark.parametrize(
+    ("patch", "match"),
+    [
+        ({"max_turns": None}, "missing: max_turns"),
+        ({"extra": 1}, "unknown: extra"),
+        ({"agent_timeout_multiplier": 0}, "agent_timeout_multiplier"),
+        ({"agent_setup_timeout_multiplier": "2"}, "agent_setup_timeout_multiplier"),
+        ({"max_turns": 0}, "max_turns"),
+        ({"max_turns": 2.5}, "max_turns"),
+        ({"max_budget_usd": 5}, "max_budget_usd"),
+        ({"max_budget_usd": "abc"}, "max_budget_usd"),
+        ({"max_budget_usd": "0"}, "max_budget_usd"),
+    ],
+)
+def test_load_rejects_invalid_limits(env, patch, match):
+    limits = {**LIMITS, **patch}
+    limits = {k: v for k, v in limits.items() if v is not None}
+    with pytest.raises(SystemExit, match=match):
+        rnd.Round.load(_write_round(env, limits=limits), root=env)

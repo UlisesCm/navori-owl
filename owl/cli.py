@@ -39,19 +39,16 @@ ENV_FILE = ROOT / ".env"
 
 def _round_flags(round_def: Round) -> list[str]:
     """Harbor flags that are identical for every variant of a round (R10, R11)."""
-    raw = round_def.raw
+    limits = round_def.limits
     flags = ["--extra-instruction-path", str(round_def.dir / "preamble.md")]
     for flag, key in (
         ("--agent-timeout-multiplier", "agent_timeout_multiplier"),
         ("--agent-setup-timeout-multiplier", "agent_setup_timeout_multiplier"),
     ):
-        if key in raw:
-            flags += [flag, str(raw[key])]
-    if "max_turns" in raw:
-        flags += ["--ak", f"max_turns={int(raw['max_turns'])}"]
-    if "max_budget_usd" in raw:
-        # Harbor types max_budget_usd as str and --ak goes through json.loads: pass a JSON string.
-        flags += ["--ak", f"max_budget_usd={json.dumps(str(raw['max_budget_usd']))}"]
+        flags += [flag, str(limits[key])]
+    flags += ["--ak", f"max_turns={int(limits['max_turns'])}"]
+    # Harbor types max_budget_usd as str and --ak goes through json.loads: pass a JSON string.
+    flags += ["--ak", f"max_budget_usd={json.dumps(str(limits['max_budget_usd']))}"]
     return flags
 
 

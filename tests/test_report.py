@@ -33,7 +33,7 @@ class Lab:
         (rdir / "round.yaml").write_text(yaml.safe_dump({
             "id": "r1", "model": "anthropic/claude-haiku-4-5-20251001", "agent_version": "2.1.281",
             "variants": [BASE, PLACEBO, HARNESS], "baseline": BASE, "placebo": PLACEBO,
-            "tasks": [f"tasks/{t}" for t in tasks], "k": k, "retries": 1, "jobs_dir": "jobs/r1",
+            "tasks": [f"tasks/{t}" for t in tasks], "k": k, "retries": 1, "limits": {"agent_timeout_multiplier": 3.0, "agent_setup_timeout_multiplier": 2.0, "max_turns": 300, "max_budget_usd": "5.00"}, "jobs_dir": "jobs/r1",
             "prices_usd_per_mtok": {"input": 1, "output": 5, "cache_read": 0.1, "cache_write_5m": 1.25, "cache_write_1h": 2},
             "scope": {"always_allowed": ["CHANGELOG.md"], "test_paths": ["packages/*/test/"]},
             "analysis": {"alpha": 0.05, "interval": 0.95, "bootstrap_resamples": 200, "bootstrap_seed": 7},
