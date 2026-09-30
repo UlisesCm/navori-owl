@@ -1,6 +1,6 @@
 # Sesión actual
 
-**Estado:** F3 en curso (`specs/f3-ronda1/`, spec rev. 3 aprobado). Lote 0/1 y T18 implementados y aprobados (T1–T6, T18) en `feat/f3-lote1`; `owl validate --suite` 12/12. Siguiente: lotes 2 y 3 (T7–T14, en paralelo) y luego lote 4 (T15–T17) con T19–T20. Notas de investigación de Terminal-Bench y Harbor en `docs/research/08-terminal-bench-y-harbor.md` (§5 reward hacking pendiente); candidatas A–I para F3 sin decidir.
+**Estado:** F3 en curso (`specs/f3-ronda1/`, spec rev. 3 aprobado). Lote 0/1 y T18 (T1-T6, T18) implementados y aprobados en `feat/f3-lote1`; `owl validate --suite` 12/12. Investigación de Terminal-Bench y Harbor completa en `docs/research/08-terminal-bench-y-harbor.md`. **Decisiones pendientes antes de T22/T23:** (1) cerrar el hueco del verifier `node --test` (RH1+RH3+RH4, un solo cambio de `lib.sh`, primero probar el ataque `import-payload` en Docker con Node 22); (2) cuáles candidatas A-I / RH2 / H1-H3 entran a F3 (H1 `HARBOR_TELEMETRY=0` es una línea); (3) arreglar `VISION.md:173` (red). Siguiente en el plan: lotes 2 y 3 (T7-T14, en paralelo).
 
 ## Tarea
 Cerrar F0 según VISION §13: gate de contaminación funcionando sobre corridas reales, telemetría por variante, tests ocultos al agente.
