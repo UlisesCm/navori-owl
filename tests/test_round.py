@@ -114,6 +114,19 @@ def test_dirty_tree_refused_with_paths(tmp_path, capsys):
     assert "tasks/t/new.txt" not in err  # R3: tracked paths only
 
 
+# Covers: R3
+def test_dirty_paths_lists_both_sides_of_a_rename(tmp_path):
+    root = tmp_path
+    for rel in ("rounds/r1/round.yaml", "tasks/t/old.txt"):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("same content, long enough for rename detection\n")
+    _git(root, "init", "-q")
+    _git(root, "add", ".")
+    _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init")
+    _git(root, "mv", "tasks/t/old.txt", "tasks/t/new.txt")
+    assert rnd.dirty_paths(root / "rounds" / "r1", root) == ["tasks/t/new.txt", "tasks/t/old.txt"]
+
+
 # Covers: R1, R3, R4, R5
 def test_round_record_hashes(tmp_path):
     root = tmp_path

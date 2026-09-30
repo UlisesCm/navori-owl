@@ -142,7 +142,17 @@ def dirty_paths(round_dir: Path | str, root: Path = ROOT) -> list[str]:
     """Paths under the round dir and the frozen trees that differ from HEAD (tracked only, per R3)."""
     round_rel = Path(round_dir).resolve().relative_to(root.resolve()).as_posix()
     out = _git(root, "status", "--porcelain", "-z", "-uno", "--", round_rel, *_CLEAN_DIRS)
-    return sorted(entry[3:] for entry in out.split("\0") if len(entry) > 3)
+    paths: list[str] = []
+    entries = iter(out.split("\0"))
+    for entry in entries:
+        if len(entry) <= 3:
+            continue
+        paths.append(entry[3:])
+        if entry[0] in "RC":  # rename/copy: the next record is the source path, with no status prefix
+            old = next(entries, "")
+            if old:
+                paths.append(old)
+    return sorted(paths)
 
 
 def require_clean_tree(round_dir: Path | str, root: Path = ROOT) -> None:
