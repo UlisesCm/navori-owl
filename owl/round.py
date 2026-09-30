@@ -8,6 +8,7 @@ import random
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ import yaml
 from owl.tasks import HOLDOUT_DIR, exit_refused, refuse_holdout
 from owl.variants import ROOT, Variant
 
+LIMIT_KEYS = ("agent_timeout_multiplier", "agent_setup_timeout_multiplier", "max_turns", "max_budget_usd")
 PRICE_KEYS = ("input", "output", "cache_read", "cache_write_5m", "cache_write_1h")
 _ROUND_FILES = ("RULES.md", "round.yaml", "preamble.md")
 _CLEAN_DIRS = ("tasks", "holdout", "variants", "owl", "patient")
@@ -34,6 +36,7 @@ class Round:
     prices_usd_per_mtok: dict[str, float]
     artifacts: list[str] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict)
+    limits: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def load(cls, round_dir: Path | str, root: Path = ROOT) -> Round:
@@ -66,6 +69,7 @@ class Round:
             if int(value) < 1:
                 raise SystemExit(f"{path}: {key} must be >= 1")
 
+        limits = _validate_limits(path, data)
         artifacts: list[str] = []
         for vid in variant_ids:
             variant = Variant.load(vid)  # exits on an unknown variant
@@ -89,7 +93,43 @@ class Round:
             prices_usd_per_mtok={k: float(v) for k, v in prices.items()},
             artifacts=artifacts,
             raw=data,
+            limits=limits,
         )
+
+
+def _validate_limits(path: Path, data: dict[str, Any]) -> dict[str, Any]:
+    """The round's ``limits`` mapping with exactly the four LIMIT_KEYS, typed; exit otherwise (R11, R13)."""
+    limits = data.get("limits")
+    if not isinstance(limits, dict):
+        stray = [k for k in LIMIT_KEYS if k in data]
+        hint = f" (found at top level: {', '.join(stray)}; nest them under 'limits')" if stray else ""
+        raise SystemExit(f"{path}: missing required mapping 'limits'{hint}")
+    missing = [k for k in LIMIT_KEYS if k not in limits]
+    extra = [k for k in limits if k not in LIMIT_KEYS]
+    if missing or extra:
+        raise SystemExit(
+            f"{path}: limits must have exactly {', '.join(LIMIT_KEYS)}"
+            + (f"; missing: {', '.join(missing)}" if missing else "")
+            + (f"; unknown: {', '.join(map(str, extra))}" if extra else "")
+        )
+
+    def number(v: object) -> bool:
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+
+    for key in ("agent_timeout_multiplier", "agent_setup_timeout_multiplier"):
+        if not number(limits[key]):
+            raise SystemExit(f"{path}: limits.{key} must be a number > 0")
+    turns = limits["max_turns"]
+    if isinstance(turns, bool) or not isinstance(turns, int) or turns < 1:
+        raise SystemExit(f"{path}: limits.max_turns must be an integer >= 1")
+    budget = limits["max_budget_usd"]
+    try:
+        ok = isinstance(budget, str) and Decimal(budget) > 0 and Decimal(budget).is_finite()
+    except InvalidOperation:
+        ok = False
+    if not ok:
+        raise SystemExit(f"{path}: limits.max_budget_usd must be a string parseable as a positive decimal (e.g. \"5.00\")")
+    return dict(limits)
 
 
 def _git(root: Path, *args: str) -> str:

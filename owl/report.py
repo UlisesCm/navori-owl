@@ -382,8 +382,7 @@ def _descriptive(variant: str, trials: list[Trial], round_def: Round, counts: di
 
 def _conformance(round_def: Round, trials: list[Trial]) -> dict:
     """§2: what the round fixes, the trials the gate flagged for it and ``task_checksum`` per task."""
-    raw = round_def.raw
-    limits = {k: (raw.get("limits") or {}).get(k, raw.get(k)) for k in _LIMIT_KEYS}
+    limits = {k: round_def.limits[k] for k in _LIMIT_KEYS}
     checksums: dict[str, set[str]] = defaultdict(set)
     for t in trials:
         if t.checksum:

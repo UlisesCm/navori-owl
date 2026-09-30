@@ -209,7 +209,11 @@ def _round(tmp_path: Path, **raw: object) -> Round:
     return Round(
         id="r1", dir=rdir, model="anthropic/claude-haiku-4-5-20251001", agent_version="2.1.281",
         variants=["vanilla-default"], baseline="vanilla-default", placebo="vanilla-default", tasks=[],
-        prices_usd_per_mtok=PRICES, artifacts=[], raw={"max_turns": 300, "max_budget_usd": "5.00", **raw},
+        prices_usd_per_mtok=PRICES, artifacts=[], raw=raw,
+        limits={
+            "agent_timeout_multiplier": 3.0, "agent_setup_timeout_multiplier": 2.0,
+            "max_turns": 300, "max_budget_usd": "5.00",
+        },
     )
 
 
@@ -359,3 +363,12 @@ def test_result_event_flag(tmp_path: Path) -> None:
     init = {"type": "system", "subtype": "init", "plugins": [], "mcp_servers": []}
     (no_result / "agent" / "claude-code.txt").write_text(json.dumps(init) + "\n")
     assert check_trial(no_result, VARIANT).result_event is False
+
+
+def test_round_conformance_flags_mismatched_max_turns_and_budget(tmp_path: Path) -> None:
+    """Covers: R11, R13, R20"""
+    trial = _round_trial(tmp_path, "fix it\n\nWork unattended.\n", max_turns=2, max_budget_usd="1.00")
+    gate = check_trial(trial, ROUND_VARIANT, _round(tmp_path))
+    assert gate.category == "contamination"
+    assert any("max_turns expected '300', recorded '2'" in r for r in gate.reasons)
+    assert any("max_budget_usd" in r for r in gate.reasons)

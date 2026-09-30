@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-30 21:50 orchestrator — F3 T21 (parte 1): tarea smoke sobre el paciente y límites de ronda anidados
+- Cambios: tasks/02-smoke-patient nueva (bug `toCsv` RFC 4180, `owl_type = "smoke"`, validate PASS), owl/round.py (`Round.limits` obligatorio con 4 claves, falla fuerte), owl/cli.py (`_round_flags` siempre emite los 4), owl/gate.py (conformidad compara `max_turns` y `max_budget_usd`), owl/report.py, tests.
+- Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 257 passed; reviewer APPROVED.
+- Notas: el primer smoke real (6 variantes sobre 00-smoke, 3 forzados con vanilla) encontró dos problemas: navori y gentle-ai fallan el setup en 00-smoke por diseño (su init exige el sentinel del CLAUDE.md del paciente) y ningún límite llegaba a harbor (max_turns=2 → 8 turnos) porque cli y gate leían `max_turns` etc. de la raíz de round.yaml con `if key in raw`, mientras el contrato los anida en `limits:`. El preámbulo sí llegaba. Deuda (MEDIO): harbor no registra los multiplicadores de timeout en `config.json`, así que la conformidad no los verifica.
+- Commit / PR: branch feat/f3-t21-smoke
+
 ## 2026-09-30 21:10 orchestrator — F3 lote 5 (T19-T20): owl report, política de exclusión, lista de fallas y holdout
 - Cambios: owl/report.py nuevo (`owl report --round DIR [--holdout]`: report.md y report.json, secciones D14 1-10), owl/summary.py (`tampered` conservado como fracaso, `f2p` n/a, `held_jobs` rechaza holdout antes de leer logs), owl/gate.py (`TrialGate.result_event`), owl/cli.py, tests.
 - Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 243 passed; reviewer APPROVED.

@@ -33,7 +33,7 @@ def rnd(tmp_path) -> Round:
         id="r1", dir=tmp_path, model="m", agent_version="2.1.0", variants=list(OWN),
         baseline="vanilla-default", placebo="placebo", tasks=[], prices_usd_per_mtok={},
         artifacts=list(ARTIFACTS),
-        raw={
+        limits={
             "agent_timeout_multiplier": 3.0, "agent_setup_timeout_multiplier": 2.0,
             "max_turns": 300, "max_budget_usd": "5.00",
         },
@@ -79,3 +79,12 @@ def test_artifacts_union_passed_to_every_variant(rnd):
     # Outside round mode the command is unchanged.
     plain = _cmd("navori", None)
     assert not any(a.startswith(("artifacts=", "max_turns=", "max_budget_usd=")) for a in _pairs(plain, "--ak"))
+
+
+# Covers: R11, R13, R20
+def test_round_flags_carry_all_four_limits(rnd):
+    cmd = _cmd("vanilla-default", rnd)
+    assert _pairs(cmd, "--agent-timeout-multiplier") == ["3.0"]
+    assert _pairs(cmd, "--agent-setup-timeout-multiplier") == ["2.0"]
+    aks = _pairs(cmd, "--ak")
+    assert "max_turns=300" in aks and 'max_budget_usd="5.00"' in aks
