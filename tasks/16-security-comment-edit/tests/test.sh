@@ -29,7 +29,7 @@ if [ "$OWL_BASELINE_VALID" = "1" ] && [ -d "$OWL_TESTS_DIR/exploits" ]; then
     done <<EOT
 $exploit_files
 EOT
-    if runuser -u node -- node --test "${exploit_args[@]}" > /logs/verifier/exploits.log 2>&1; then
+    if owl_run_node_tests /logs/verifier/exploits.log "${exploit_args[@]}"; then
       OWL_SECURITY=1
     fi
   fi

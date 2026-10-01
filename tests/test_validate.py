@@ -500,6 +500,21 @@ def test_evaluate_dimensions_fails_without_any_reward() -> None:
     assert not ok and reasons
 
 
+# Covers: R31, R32
+@pytest.mark.parametrize("attack", ["import-payload", "assert-patch", "forged-frame"])
+def test_evaluate_cheat_in_process_attacks_need_f2p_and_p2p_zero(attack: str) -> None:
+    """reward 0 alone is not enough: scope (or any other dimension) can zero the reward while the
+    hole is still open, so both f2p and p2p must be 0."""
+    ok, reasons = evaluate_cheat(attack, {"reward": 0, "f2p": 0, "p2p": 0}, {"reward": 0}, ["f2p", "p2p"])
+    assert ok is True, reasons
+    for leaked in ({"reward": 0, "f2p": 1, "p2p": 0}, {"reward": 0, "f2p": 0, "p2p": 1}):
+        ok, reasons = evaluate_cheat(attack, leaked, {"reward": 0}, ["f2p", "p2p"])
+        assert ok is False, leaked
+        assert any("expected 0" in r for r in reasons), reasons
+    ok, reasons = evaluate_cheat(attack, {"reward": 0, "p2p": 0}, {"reward": 0}, ["f2p", "p2p"])
+    assert not ok and "f2p=None" in reasons[0]
+
+
 # Covers: R10
 def test_evaluate_cheat_hardcode_fails_loudly_without_script() -> None:
     ok, reasons = evaluate_cheat("hardcode", {"reward": 0}, {}, ["f2p"], hardcode_script_present=False)

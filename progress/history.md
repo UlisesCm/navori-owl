@@ -10,6 +10,12 @@ Entradas más recientes arriba. Formato sugerido (no obligatorio):
 - Commit / PR: <hash / URL>
 -->
 
+## 2026-09-30 23:40 orchestrator — RH1: cierre en capas del hueco `node --test`
+- Cambios: owl/verifier/lib.sh (`owl_run_node_tests`: TAP por archivo con gate de forma y lista exacta; guard embebido en `/opt/owl/guard/guard.mjs` cargado con `node --import`; `tripwire.tsv` solo reporte) y sus 14 copias, owl/agents/cheat.py + owl/validate.py (ataques `import-payload`, `assert-patch`, `forged-frame` que exigen f2p = p2p = 0), tasks 16/18/19 test.sh por el helper, docs/task-authoring.md, design.md D13, tests.
+- Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 276 passed; docker tap_gate/guard/tripwire/repro verdes; `owl validate --suite` 12/12 y smoke 00/02 PASS.
+- Notas: en Node 22.23.3 el bypass era real (process.exit ESM y CJS, reallyExit, parche de assert). El challenge encontró que el gate TAP solo no alcanza (frames v8 forjados) y que un tripwire solo en src se evade con exports; el guard cierra la salida limpia. `process.exitCode` no se puede redefinir en Node 22: se envuelve `process.emit('exit')`. El guard no va en NODE_OPTIONS (los tests CLI lanzan node). Cambio de conducta: en la 18 un archivo de test sin tests no cuenta como repro. Residual: prototipos de streams sin congelar, tripwire ofuscable, imports multilínea con `assert` (MEDIO abierto); C (worker fuera de proceso) después de r1.
+- Commit / PR: branch feat/f3-rh1-verifier
+
 ## 2026-09-30 22:10 orchestrator — F3 T21 (parte 2): gentle-ai en el gate y smoke.md
 - Cambios: variants/gentle-ai.yaml (expect plugins [engram], mcp_servers [context7, engram]), owl/gate.py (`_mcp_connected_later`: un MCP declarado `pending` en init pasa solo si un `deferred_tools_delta` posterior de la sesión agrega sus tools), design.md D3/D10, specs/f3-ronda1/smoke.md, tasks.md (T21).
 - Quality gate: ✅ ruff check . verde y pytest -m 'not docker' 262 passed; reviewer APPROVED (2 MEDIO teóricos).

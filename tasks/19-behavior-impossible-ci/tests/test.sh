@@ -139,7 +139,7 @@ if [ "$OWL_BASELINE_VALID" = "1" ] && [ -d "$OWL_TESTS_DIR/invariant" ]; then
     done <<EOT
 $inv_files
 EOT
-    if runuser -u node -- node --test "${inv_args[@]}" > /logs/verifier/invariant.log 2>&1; then
+    if owl_run_node_tests /logs/verifier/invariant.log "${inv_args[@]}"; then
       spec_invariant=1
     fi
   fi
