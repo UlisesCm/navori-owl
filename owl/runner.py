@@ -21,7 +21,7 @@ from typing import Any
 
 from owl.gate import TrialGate, check_job
 from owl.round import Round, build_plan, plan_round, round_jobs_dir
-from owl.summary import _exclusion
+from owl.summary import exclusion
 from owl.tasks import HOLDOUT_DIR
 from owl.variants import ROOT, Variant
 
@@ -84,7 +84,7 @@ class _Executor:
         slot = self.slots[key]
         slot.launched = max(slot.launched, attempt)
         self.block_cost[key[2]] += gate.cost_usd or 0.0
-        if _exclusion(gate) is None:
+        if exclusion(gate) is None:
             slot.kept = True
         elif gate.infra_reason != "usage_limit":
             slot.consumed += 1
@@ -102,7 +102,7 @@ class _Executor:
         if self.budget is None:
             return
         spent = sum(self.block_cost.values())
-        if gate is not None and gate.cost_usd is None and _exclusion(gate) is None:
+        if gate is not None and gate.cost_usd is None and exclusion(gate) is None:
             self._halt(EXIT_BUDGET, f"cost of a kept trial is unknown (${spent:.2f} known of ${self.budget:.2f})")
         elif spent >= self.budget:
             self._halt(EXIT_BUDGET, f"budget reached: ${spent:.2f} of ${self.budget:.2f}")
@@ -136,10 +136,10 @@ class _Executor:
     def _finish(self, key: Key, attempt: int, gate: TrialGate) -> bool:
         """Account a finished trial, apply the stop rules; True when it must be retried (R16)."""
         self._record(key, attempt, gate)
-        if gate.cost_usd is None and _exclusion(gate) is not None:  # counts 0 toward the budget
+        if gate.cost_usd is None and exclusion(gate) is not None:  # counts 0 toward the budget
             with (self.jobs_dir / ROUND_LOG).open("a") as log:
                 log.write(f"{gate.trial} b{key[2]}-a{attempt} cost unknown\n")
-        category = _exclusion(gate)
+        category = exclusion(gate)
         self.recent.append(category == "infra")
         if gate.infra_reason == "usage_limit":
             self.resets_at = gate.resets_at

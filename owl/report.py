@@ -24,13 +24,13 @@ from owl import analysis
 from owl.gate import TrialGate, check_job
 from owl.round import Round
 from owl.summary import (
-    _exclusion,
-    _holdout_ref,
-    _task_name,
+    exclusion,
     held_jobs,
+    holdout_ref,
     is_tampered,
     summarize,
     task_info,
+    task_name,
 )
 from owl.tasks import TaskInfo, exit_refused
 from owl.variants import ROOT
@@ -161,11 +161,11 @@ def _build_trial(gate: TrialGate, meta: dict, trial_dir: Path, round_def: Round)
     block, attempt = meta.get("block"), meta.get("attempt")
     result = _read_json(trial_dir / "result.json")
     trial = Trial(
-        gate=gate, task=_task_name(gate), variant=gate.variant,
+        gate=gate, task=task_name(gate), variant=gate.variant,
         block=block if isinstance(block, int) else None,
         attempt=attempt if isinstance(attempt, int) else 1,
-        kept=_exclusion(gate) is None, tampered=is_tampered(gate), trial_dir=trial_dir,
-        holdout=_holdout_ref(gate) is not None,
+        kept=exclusion(gate) is None, tampered=is_tampered(gate), trial_dir=trial_dir,
+        holdout=holdout_ref(gate) is not None,
         agent_seconds=_seconds(result), checksum=result.get("task_checksum"),
         started_at=result.get("started_at"), finished_at=result.get("finished_at"),
     )

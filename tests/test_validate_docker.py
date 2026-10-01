@@ -630,8 +630,9 @@ def test_gentle_ai_install_on_patient(patient_image: str, tmp_path: Path) -> Non
             "sed -i '/opsdesk-conventions-sentinel-f96c2e/d' /app/CLAUDE.md /app/AGENTS.md",
             user="root",
         )
-        with pytest.raises(AssertionError):
+        with pytest.raises(AssertionError) as exc:
             _docker_exec(name, f"{env}cd /app && {init}", user="node")
+        assert "base CLAUDE.md content missing" in str(exc.value)
     finally:
         _teardown_container(name, tag)
 

@@ -12,7 +12,10 @@
 #   as shipped.
 # - Telemetry: OFF. `GENTLE_AI_TELEMETRY=0` is exported in `init` (install-time telemetry) and set in
 #   `harness.env` (the Stop/SubagentStop hooks would otherwise report model and tokens each session).
-#   Verified in the spike: status `disabled (source: GENTLE_AI_TELEMETRY)`, hooks answer "disabled".
+#   Evidence: the spike saw status `disabled (source: GENTLE_AI_TELEMETRY)` and hooks answering
+#   "disabled"; the T21 smoke (specs/f3-ronda1/smoke.md) only shows GENTLE_AI_TELEMETRY=0 in the
+#   agent env and the telemetry Stop hook running with no output or errors. That nothing is reported
+#   is inferred from the env var, not observed on the wire.
 # - Where it writes (spike T11 §4-§5): the project side (/app/.claude/**, /app/.mcp.json with context7)
 #   stays as installed. State and tools in $HOME (~/.gentle-ai, ~/.config/gga, ~/.local/share/gga,
 #   ~/.engram, ~/.local/bin/{gga,engram}) stay in $HOME. Themes (~/.claude/themes) are not bridged.

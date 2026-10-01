@@ -43,7 +43,7 @@ def _patch_super_install(monkeypatch: pytest.MonkeyPatch, seen: list[str]) -> No
     monkeypatch.setattr(ClaudeCode, "install", fake)
 
 
-# Covers: R12
+# Covers: R8, R12
 def test_install_runs_harness_steps_not_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[str] = []
     _patch_super_install(monkeypatch, seen)
@@ -69,7 +69,7 @@ def test_install_runs_harness_steps_not_run(tmp_path: Path, monkeypatch: pytest.
     assert calls == []
 
 
-# Covers: R12
+# Covers: R8, R12
 def test_install_continues_when_claude_already_installed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -87,7 +87,7 @@ def test_install_continues_when_claude_already_installed(
     assert any("variant installed" in c for c in commands)
 
 
-# Covers: R8
+# Covers: R8, R12
 def test_artifacts_appended_as_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_super_install(monkeypatch, [])
     # No init_command: the append must not depend on it.

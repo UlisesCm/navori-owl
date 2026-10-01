@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -109,3 +110,34 @@ def test_gentle_ai_telemetry_off_in_install_and_run() -> None:
 def test_gentle_ai_expect_matches_real_install() -> None:
     v = Variant.load("gentle-ai")
     assert v.expect == {"plugins": ["engram"], "mcp_servers": ["context7", "engram"]}
+
+
+def _audit_rows() -> list[tuple[str, str, str]]:
+    """(first cell, variant cell, verdict cell) of each row of the audit's tables."""
+    rows = []
+    for line in (variants_module.ROOT / "specs" / "f3-ronda1" / "artifacts-audit.md").read_text().splitlines():
+        if not line.startswith("| `"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split(" | ")]
+        rows.append((cells[0], cells[1], cells[-1]))
+    return rows
+
+
+# Covers: R9
+def test_artifacts_audit_has_one_row_per_declared_prefix() -> None:
+    rows = _audit_rows()
+    declared = [
+        (vid, prefix)
+        for path in sorted((variants_module.ROOT / "variants").glob("*.yaml"))
+        for vid in [path.stem]
+        for prefix in Variant.load(vid).artifacts
+    ]
+    assert declared
+    # A row audits a prefix when it is the row's subject or the verdict narrows the row to it.
+    missing = []
+    for vid, prefix in declared:
+        token = f"`{prefix}`"
+        hits = [r for r in rows if r[1] == vid and (r[0] == token or re.search(rf"→.*{re.escape(token)}", r[2]))]
+        if len(hits) != 1:
+            missing.append((vid, prefix, len(hits)))
+    assert not missing, f"artifacts-audit.md needs exactly one row per (variant, prefix): {missing}"
