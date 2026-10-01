@@ -108,8 +108,10 @@ _run_tests() {
   home=$(mktemp -d /tmp/owl-home.XXXXXX)
   chown node:node "$home"
   chmod 700 "$home"
-  timeout 120 runuser -u node -- env -i HOME="$home" TMPDIR="$home" PATH=/usr/local/bin:/usr/bin:/bin \
-    node --test "${new_tests[@]}" > "$1" 2>&1
+  # Through lib.sh's helper (TAP gate + guard): same clean env via the prefix hook, same 120 s bound
+  # per file. rc 124 is reported by OWL_TEST_TIMED_OUT (the helper's own status is 0 / 1).
+  OWL_TEST_CMD_PREFIX=(env -i HOME="$home" TMPDIR="$home" PATH=/usr/local/bin:/usr/bin:/bin)
+  OWL_TEST_TIMEOUT=120 owl_run_node_tests "$1" "${new_tests[@]}"
 }
 
 # Item: a stale static list must not let a new visible test count as agent-authored. With a valid
@@ -140,7 +142,7 @@ if [ "${#new_tests[@]}" -gt 0 ]; then
   rc=$?
   pkill -KILL -u node >/dev/null 2>&1 || true
   owl_snapshot "$rdir/after" >/dev/null 2>&1
-  [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ] && repro_fails_baseline=1
+  [ "$rc" -ne 0 ] && [ "$OWL_TEST_TIMED_OUT" != 1 ] && repro_fails_baseline=1
   # Anything the first run left in /app (ignoring the ignored runtime dirs) is tampering.
   if ! diff <(grep -vE '/app/(node_modules|data/tmp)/' "$rdir/before") \
             <(grep -vE '/app/(node_modules|data/tmp)/' "$rdir/after") >/dev/null; then
