@@ -53,7 +53,9 @@
     "criticalPaths": [],
     "testsExclude": [],
     "localSkills": [],
-    "libraries": [],
+    "libraries": [
+      "pytest"
+    ],
     "libraryMigrations": [],
     "codeLanguage": "python"
   }

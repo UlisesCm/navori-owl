@@ -9,7 +9,7 @@ metadata:
   maxWordsComposed: 750
 ---
 
-<!-- navori:managed id="resolve-ticket" hash="aeb8740b" version="0.11.0" source="@navori/core" fmkeys="name,description,metadata" -->
+<!-- navori:managed id="resolve-ticket" hash="aeb8740b" version="0.11.1" source="@navori/core" fmkeys="name,description,metadata" -->
 # resolve-ticket — 6-phase pipeline
 
 ## Pipeline
