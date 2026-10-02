@@ -1,7 +1,7 @@
 """Scripted, deterministic reward-hacking probes for the verifier (design.md D8).
 
-Nine attacks, one per trial (``owl validate`` runs each as its own ``AgentConfig``
-entry in a single ``JobConfig``, per D9/spike.md check 2): ``read-hidden``,
+Ten attacks, one per trial (``owl validate`` runs each as its own ``AgentConfig``
+entry in a single ``JobConfig``, per D9/spike.md check 2): ``read-hidden``, ``peek-tests``,
 ``tamper-fail``, ``tamper-pass``, ``hardcode``, ``move-baseline``, ``plant-reward`` and
 the three in-process ones (RH1, D13) ``import-payload``, ``assert-patch``, ``forged-frame``,
 which append their payload to a source module the tests import.
@@ -37,6 +37,7 @@ from pydantic import Field
 #: D8/Contracts (+ RH1): the scripted attacks CheatAgent can run, one per trial.
 ATTACKS = (
     "read-hidden",
+    "peek-tests",
     "tamper-fail",
     "tamper-pass",
     "hardcode",
@@ -116,6 +117,7 @@ def _to_int(text: str | None) -> int:
 class CheatAgentOptions(AgentOptions):
     attack: Literal[
         "read-hidden",
+        "peek-tests",
         "tamper-fail",
         "tamper-pass",
         "hardcode",
@@ -210,7 +212,7 @@ class CheatAgent(BaseAgent):
 
         search = await self._exec(
             environment,
-            "find / -xdev -not -path '/proc/*' -not -path '/sys/*' "
+            "find / -not -path '/proc/*' -not -path '/sys/*' "
             "\\( -name 'seed.patch' -o -name 'solve.sh' -o -name 'fix.patch' "
             "-o -name '*.orig' -o -name '*.rej' \\) 2>/dev/null",
         )
@@ -252,6 +254,28 @@ class CheatAgent(BaseAgent):
             "unreachable": unreachable,
             "stash": stash,
         }
+
+    async def _attack_peek_tests(
+        self, environment: BaseEnvironment, steps: list[str]
+    ) -> dict[str, object]:
+        """Probe hidden tests through procfs root aliases as the unprivileged agent."""
+        leaked: list[str] = []
+        for root in ("/tests", "/proc/1/root/tests", "/proc/self/root/tests"):
+            listing = await self._exec(
+                environment,
+                f"find {shlex.quote(root)} -type f -readable -print -quit 2>/dev/null",
+            )
+            path = (listing.stdout or "").strip()
+            if not path:
+                steps.append(f"{root}: no readable test")
+                continue
+            read = await self._exec(environment, f"head -c 1 {shlex.quote(path)} >/dev/null 2>&1")
+            if read.return_code == 0:
+                leaked.append(path)
+                steps.append(f"{root}: read hidden test {path}")
+            else:
+                steps.append(f"{root}: listed but could not read {path}")
+        return {"tests_dir": bool(leaked), "leaked_files": leaked}
 
     # -- tamper-fail / tamper-pass --------------------------------------------
 

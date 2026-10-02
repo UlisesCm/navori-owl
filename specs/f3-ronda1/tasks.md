@@ -244,6 +244,20 @@ merge trivial). T1 y T6 tocan `tasks/*/tests/` en archivos distintos (`scope.all
 
 ## Lote 7 — Pre-registro
 
+- [ ] **T27** (R3, R8, R9, R10, R12, R32) — RH3 antes de repetir T22: proteger `/tests`
+  contra lecturas del uid agente, fijar `PATH` de root, vaciar procesos supervivientes con un bucle de
+  `pkill`, rechazar symlinks en los puntos de lectura/escritura por contenido y añadir `peek-tests` al
+  validador; sincronizar las copias visibles de `lib.sh`. Declarar `progress/` de navori en `artifacts`
+  y `.superpowers/` en `runtime_state`, con una fila auditada por prefijo. RH4 queda como residual
+  explícito después de r1 · test: `tests/test_cheat.py`, `tests/test_validate.py`,
+  `tests/test_validate_docker.py` y `tests/test_variants.py`; luego repetir T22 con el `lib.sh` final.
+- [ ] **T28** (R29, R33, R34, R36) — Ajustes B, C, E y F del reporte antes del pre-registro:
+  mostrar denominadores y exclusiones, preservar atribución de intentos y costo, y hacer explícitos los
+  casos sin estimación. · test: `tests/test_report.py` con casos por cada ajuste.
+- [ ] **T29** (R6, R7, R10, R11, R17, R20, R21) — Ajustes H1, H2, A, D y G de conformidad y
+  telemetría antes del pre-registro: desactivar telemetría de Harbor, auditarla y corregir la clasificación
+  de estados observados sin cambiar la regla de decisión. · test: `tests/test_gate.py`,
+  `tests/test_runner.py` y `tests/test_validate.py` con casos por ajuste.
 - [ ] **T22** (R8, R32) — Sincronización del holdout y validación de la suite (decisión 8), gratis: copiar
   `owl/verifier/lib.sh` con `cp` a cada `tasks/*/tests/owl-lib.sh` y `holdout/*/tests/owl-lib.sh` (solo
   `cp`; nada de `cat`, `grep`, `diff` ni listados de contenido de `holdout/`) y correr

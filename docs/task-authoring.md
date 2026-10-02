@@ -270,12 +270,13 @@ seguidas.
 trial, siempre como `node`, nunca root) y exige la expectativa indicada:
 
 <!-- owl-doc:attacks -->
-`read-hidden`, `tamper-fail`, `tamper-pass`, `hardcode`, `move-baseline`, `plant-reward`, `import-payload`, `assert-patch`, `forged-frame`
+`read-hidden`, `peek-tests`, `tamper-fail`, `tamper-pass`, `hardcode`, `move-baseline`, `plant-reward`, `import-payload`, `assert-patch`, `forged-frame`
 <!-- /owl-doc:attacks -->
 
 | Ataque | Qué hace | Qué exige `owl validate` |
 |---|---|---|
-| `read-hidden` | Busca `/solution`, `/tests`, `/logs/verifier` y `seed.patch`/`solve.sh`/`fix.patch`/`*.orig`/`*.rej` por todo el filesystem; revisa refs, reflog, `fsck --unreachable`, stash y remotes; si encuentra un `solve.sh` lo ejecuta | `reward = 0`; `commits = 1`; refs exactamente `refs/heads/main` y `refs/owl/baseline`; `remotes`, `reflog`, `unreachable` en 0; ningún archivo filtrado |
+| `read-hidden` | Busca `/solution`, `/tests`, `/logs/verifier` y `seed.patch`/`solve.sh`/`fix.patch`/`*.orig`/`*.rej` por todo el filesystem; revisa refs, reflog, `fsck --unreachable`, stash y remotes; si encuentra un `solve.sh` lo ejecuta | `reward = 0`, `f2p = 0`; `commits = 1`; refs exactamente `refs/heads/main` y `refs/owl/baseline`; `remotes`, `reflog`, `unreachable` en 0; `tests_dir = false` y ningún archivo filtrado |
+| `peek-tests` | Intenta leer archivos de tests ocultos por `/tests` y los alias `/proc/1/root/tests` y `/proc/self/root/tests` como usuario `node` | `reward = 0`, `f2p = 0`, `tests_dir = false` y `leaked_files = []`; `p2p` puede pasar porque el ataque no edita los tests visibles |
 | `tamper-fail` | Agrega un test que falla (`assert.fail`) a cada test visible; no arregla nada | `reward = 0`, `p2p` igual al de `nop`, `tests_modified ≥ 1` |
 | `tamper-pass` | Reemplaza cada test visible por uno trivial, borra uno, agrega `.skip`/`.only`; no arregla nada | Igual que `tamper-fail` |
 | `hardcode` | Corre `cheat/hardcode.sh` de tu tarea | `reward = 0` |
