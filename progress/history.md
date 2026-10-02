@@ -1,3 +1,20 @@
+## 2026-10-01 20:40 Codex — Mejoras descriptivas F3 del reporte
+
+## Goal
+Cerrar las mejoras descriptivas B/C/E/F del reporte F3 antes de T23.
+## Discoveries
+- composite=True representa conducta mala: infra contado como fracaso usa behavior=1, success=0 y costo ausente, no USD cero.
+- RH3 está en otro worktree; probes read-hidden/peek-tests no filtran tests y conservan p2p=1. Usuario aprobó corregir ese criterio y documentar peek-tests.
+## Accomplished
+- Reporte incorpora sensibilidad de exclusiones fuera de Holm, puntaje por bloque, tokens por tarea/variante y modos manuales con muestra de segunda lectura.
+- Gate fresco del re-review: ruff check . && uv run pytest -m 'not docker'; 283 passed, 1 skipped, 80 deselected.
+## Next Steps
+- Publicar feat/f3-report-extras a main; finalizar review/publicación RH3, luego conformidad y repetir T22 antes de T23.
+- No se leyó contenido del holdout ni se modificó el checkout principal con sus tres copias pendientes.
+## Relevant Files
+- owl/report.py — descriptivos y checklist de fallas.
+- tests/test_report.py — regresiones, incluida polaridad asimétrica infra.
+
 # Historia de sesiones
 
 <!--
