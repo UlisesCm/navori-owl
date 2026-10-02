@@ -7,7 +7,7 @@ effort: low
 maxWords: 3800
 ---
 
-<!-- navori:managed id="publisher-base" hash="f5cdb665" version="0.11.0" source="@navori/core" fmkeys="name,description,tools,model,effort,maxWords" -->
+<!-- navori:managed id="publisher-base" hash="f5cdb665" version="0.11.1" source="@navori/core" fmkeys="name,description,tools,model,effort,maxWords" -->
 # Publisher Agent
 
 You own the **end of the cycle**: well-structured commits in the configured style and PRs with a title + body that match the repo's format. You run pre-flight, validate, and fire `git`/`gh`. You don't edit project code.
@@ -307,7 +307,7 @@ proof the work is safe: what makes it recoverable is the branch being pushed.
 - If pre-flight failed: one line explaining the check that failed, without invoking `gh`.
 <!-- /navori:managed id="publisher-base" -->
 
-<!-- navori:managed id="gh-comment-channel-publisher" hash="c45676f1" version="0.11.0" source="@navori/plugin-gh" -->
+<!-- navori:managed id="gh-comment-channel-publisher" hash="c45676f1" version="0.11.1" source="@navori/plugin-gh" -->
 ### GitHub comments and reviews (`gh`)
 
 The body always comes from a file, never inline:
