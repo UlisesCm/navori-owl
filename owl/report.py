@@ -37,6 +37,9 @@ from owl.variants import ROOT
 
 PHRASE = "r1 es una ronda de costo y comportamiento; el éxito es descriptivo"
 _LIMIT_KEYS = ("agent_timeout_multiplier", "agent_setup_timeout_multiplier", "max_turns", "max_budget_usd")
+_TOKEN_KEYS = ("input", "output", "cache_read", "cache_write")
+_FAILURE_MODES = ("agent", "insufficient instruction", "narrow verifier", "broad verifier",
+                  "near miss", "time cut", "infra")
 
 
 @dataclass(frozen=True)
@@ -95,6 +98,34 @@ class Trial:
     checksum: str | None = None
     started_at: str | None = None
     finished_at: str | None = None
+    tokens: dict[str, int] | None = None
+
+
+def _tokens(trial_dir: Path) -> dict[str, int] | None:
+    """Sum token usage from result events; absent usage stays unknown, never zero."""
+    totals = dict.fromkeys(_TOKEN_KEYS, 0)
+    found = False
+    try:
+        lines = (trial_dir / "agent" / "claude-code.txt").read_text().splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict) or event.get("type") != "result":
+            continue
+        usage = event.get("usage")
+        if not isinstance(usage, dict):
+            continue
+        found = True
+        fields = (usage.get("input_tokens"), usage.get("output_tokens"),
+                  usage.get("cache_read_input_tokens"), usage.get("cache_creation_input_tokens"))
+        for key, value in zip(_TOKEN_KEYS, fields, strict=True):
+            if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                totals[key] += value
+    return totals if found else None
 
 
 def _read_json(path: Path) -> dict:
@@ -168,6 +199,7 @@ def _build_trial(gate: TrialGate, meta: dict, trial_dir: Path, round_def: Round)
         holdout=holdout_ref(gate) is not None,
         agent_seconds=_seconds(result), checksum=result.get("task_checksum"),
         started_at=result.get("started_at"), finished_at=result.get("finished_at"),
+        tokens=_tokens(trial_dir),
     )
     if not trial.kept:
         return trial
@@ -432,17 +464,100 @@ def _header(round_def: Round, trials: list[Trial], metas: list[dict]) -> dict:
     }
 
 
+def _token_totals(trials: list[Trial]) -> dict:
+    """Descriptive token sums for all non-holdout attempts, including excluded trials."""
+    by_variant: dict[str, dict[str, int]] = {}
+    by_task: dict[str, dict[str, int]] = {}
+    missing: Counter[str] = Counter()
+    for trial in trials:
+        if trial.tokens is None:
+            missing[trial.variant] += 1
+            continue
+        for group, key in ((by_variant, trial.variant), (by_task, trial.task)):
+            totals = group.setdefault(key, dict.fromkeys(_TOKEN_KEYS, 0))
+            for token in _TOKEN_KEYS:
+                totals[token] += trial.tokens[token]
+    return {"by_variant": by_variant, "by_task": by_task, "missing_usage_by_variant": dict(missing)}
+
+
+def _block_scores(trials: list[Trial], blocks: list[int], variants: list[str]) -> list[dict]:
+    """One descriptive reward score per completed block and variant."""
+    rows = []
+    for block in blocks:
+        for variant in variants:
+            mine = [t for t in trials if t.block == block and t.variant == variant]
+            kept = [t for t in mine if t.kept]
+            rows.append({"block": block, "variant": variant, "successes": sum(t.success for t in kept),
+                         "n_valid": len(kept), "excluded": len(mine) - len(kept)})
+    return rows
+
+
+def _sensitivity(round_def: Round, trials: list[Trial], tasks: list[str], blocks: list[int]) -> list[dict]:
+    """Three exclusion-policy diagnostics; no p-values or intervals enter the primary family."""
+    dropped = {
+        (t.task, t.block) for t in trials if t.block in blocks and not t.kept
+    }
+    scenarios = (
+        ("infra_as_failure", [t for t in trials if t.block in blocks and (t.kept or t.gate.category == "infra")]),
+        ("drop_task_block_pair", [t for t in trials if t.block in blocks and t.kept
+                                  and (t.task, t.block) not in dropped]),
+        ("no_retries", [t for t in trials if t.block in blocks and t.attempt == 1 and t.kept]),
+    )
+    rows = []
+    for name, members in scenarios:
+        cells: dict[tuple[str, str], list[Trial]] = defaultdict(list)
+        for t in members:
+            cells[(t.variant, t.task)].append(t)
+        for variant in round_def.variants:
+            if variant == round_def.baseline:
+                continue
+            for endpoint in ("cost", "behavior", "success"):
+                # Infra has no reliable cost; failure is bad behavior (1) or no success (0),
+                # never a fabricated zero-dollar cost.
+                pairs = []
+                for task in tasks:
+                    arms = []
+                    for arm in (variant, round_def.baseline):
+                        arm_trials = cells.get((arm, task), [])
+                        if name == "infra_as_failure" and endpoint in ("behavior", "success"):
+                            vals = [float(t.composite) if t.kept else 1.0 for t in arm_trials
+                                    if not t.kept or t.composite is not None] if endpoint == "behavior" else [
+                                        float(t.success) if t.kept else 0.0 for t in arm_trials]
+                        else:
+                            vals = _values(arm_trials, endpoint)
+                        arms.append(vals)
+                    if all(arms) and (endpoint != "cost" or all(_mean(a) > 0 for a in arms)):
+                        pairs.append(tuple(arms))
+                n_tasks = len(pairs)
+                if pairs:
+                    lefts, rights = [p[0] for p in pairs], [p[1] for p in pairs]
+                    vals = (analysis.log_cost_ratios(lefts, rights) if endpoint == "cost"
+                            else analysis.rate_differences(lefts, rights))
+                    estimate = analysis.cost_pct_change(vals) if endpoint == "cost" else _mean(vals)
+                else:
+                    estimate = None
+                rows.append({"scenario": name, "variant": variant, "endpoint": endpoint,
+                             "estimate": estimate, "n_tasks": n_tasks})
+    return rows
+
+
 def _failures(trials: list[Trial], tasks: list[str], variants: list[str]) -> list[dict]:
     """R34: per cell the first failed trial in plan order, plus every limit hit and every tampered trial."""
     mine = sorted(
-        (t for t in trials if t.kept and t.task in tasks and t.variant in variants),
+        (t for t in trials if (t.kept or t.gate.category == "infra")
+         and t.task in tasks and t.variant in variants),
         key=lambda t: (t.block or 0, t.attempt, t.gate.trial),
     )
     reasons: dict[int, list[str]] = {}
     first_failed: set[tuple[str, str]] = set()
+    first_infra: set[tuple[str, str]] = set()
     for i, t in enumerate(mine):
         found = []
-        if not t.success and (t.task, t.variant) not in first_failed:
+        if t.gate.category == "infra":
+            if (t.task, t.variant) not in first_infra:
+                first_infra.add((t.task, t.variant))
+                found.append("infra")
+        elif not t.success and (t.task, t.variant) not in first_failed:
             first_failed.add((t.task, t.variant))
             found.append("falla")
         if t.gate.limit_hit:
@@ -451,11 +566,19 @@ def _failures(trials: list[Trial], tasks: list[str], variants: list[str]) -> lis
             found.append("tampered")
         if found:
             reasons[i] = found
-    return [
+    rows = [
         {"task": mine[i].task, "variant": mine[i].variant, "trial": mine[i].gate.trial, "reason": "; ".join(r),
-         "transcript": str(mine[i].trial_dir / "agent" / "claude-code.txt")}
+         "transcript": str(mine[i].trial_dir / "agent" / "claude-code.txt"),
+         "mode": None, "second_reading_sample": False}
         for i, r in reasons.items()
     ]
+    # Deterministic minimum sample: first failure per variant gets a second independent reading.
+    sampled: set[str] = set()
+    for row in rows:
+        if row["variant"] not in sampled:
+            row["second_reading_sample"] = True
+            sampled.add(row["variant"])
+    return rows
 
 
 def _holdout(round_def: Round, trials: list[Trial]) -> dict:
@@ -524,6 +647,10 @@ def build_report(round_def: Round, root: Path = ROOT, holdout: bool = False) -> 
         "vs_placebo": vs_placebo,
         "descriptive": descriptive,
         "behavior": behavior,
+        "sensitivity": _sensitivity(round_def, primary_trials, tasks, finished),
+        "block_scores": _block_scores(primary_trials, finished, round_def.variants),
+        "token_totals": _token_totals(trials),
+        "failure_modes": list(_FAILURE_MODES),
         "disclosures": _disclosures(round_def.variants),
         "deviations": {
             "unfinished_blocks": [b for b in range(1, int(round_def.raw.get("k", 1)) + 1) if b not in finished],
@@ -668,9 +795,38 @@ def _md_disclosures(r: dict) -> str:
 
 
 def _md_failures(r: dict) -> str:
-    rows = [[f["task"], f["variant"], f["trial"], f["reason"], f["transcript"]] for f in r["failures_to_review"]]
+    rows = [[f["task"], f["variant"], f["trial"], f["reason"], f["mode"] or "pendiente",
+             "sí" if f["second_reading_sample"] else "no", f["transcript"]] for f in r["failures_to_review"]]
     return "## 9. Lista de revisión de fallas\n\n" + (
-        _table(["tarea", "variante", "trial", "motivo", "transcript"], rows) if rows else "Sin fallas."
+        _table(["tarea", "variante", "trial", "motivo", "modo", "segunda lectura", "transcript"], rows)
+        if rows else "Sin fallas."
+    ) + "\n\nModos permitidos (asignación manual): " + ", ".join(r["failure_modes"])
+
+
+def _md_extras(r: dict) -> str:
+    sensitivity = []
+    for row in r["sensitivity"]:
+        estimate = row["estimate"]
+        value = "sin datos" if estimate is None else (f"{estimate:+.1f}%" if row["endpoint"] == "cost"
+                                                  else f"{estimate * 100:+.1f} pp")
+        sensitivity.append([row["scenario"], row["variant"], row["endpoint"], value, row["n_tasks"]])
+    blocks = [[row["block"], row["variant"], f"{row['successes']}/{row['n_valid']}", row["excluded"]]
+              for row in r["block_scores"]]
+    tokens = r["token_totals"]
+    token_rows = [
+        [scope, key, *(totals[name] for name in _TOKEN_KEYS)]
+        for scope, group in (("variante", tokens["by_variant"]), ("tarea", tokens["by_task"]))
+        for key, totals in sorted(group.items())
+    ]
+    return (
+        "## Sensibilidad de exclusiones (descriptiva; fuera de la familia Holm)\n\n"
+        + _table(["escenario", "variante", "endpoint", "estimación", "tareas"], sensitivity)
+        + "\n\nEn `infra_as_failure`, costo sin dato no equivale a USD cero."
+        + "\n\n## Puntaje por bloque y variante\n\nEntre corridas, no incluye muestreo de tareas.\n\n"
+        + _table(["bloque", "variante", "éxitos", "excluidos"], blocks)
+        + "\n\n## Tokens totales (descriptivos)\n\n"
+        + _table(["nivel", "id", "input", "output", "cache read", "cache write"], token_rows)
+        + f"\n\nTrials sin uso de tokens: {tokens['missing_usage_by_variant'] or 'ninguno'}."
     )
 
 
@@ -693,7 +849,7 @@ def _md_holdout(r: dict) -> str:
 
 
 _SECTIONS = [_md_header, _md_conformance, _md_counts, _md_per_task, _md_primary, _md_placebo, _md_descriptive,
-             _md_disclosures, _md_failures, _md_holdout]
+             _md_disclosures, _md_failures, _md_extras, _md_holdout]
 
 
 def render_markdown(report: dict) -> str:

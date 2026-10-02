@@ -49,7 +49,7 @@ class Lab:
     def trial(
         self, task: str, variant: str, block: int = 1, *, attempt: int = 1, reward: dict | None = None,
         cost: float = 0.1, changes: list[str] | None = None, runtime_files: list[str] | None = None,
-        log: str = "ok", checksum: str = "sum",
+        log: str = "ok", checksum: str = "sum", usage: dict | None = None,
     ) -> None:
         """One job dir shaped like `owl run --round` + Harbor output. ``log``: ok | none | subtype."""
         self.n += 1
@@ -67,7 +67,8 @@ class Lab:
         }))
         if log != "none":
             init = {"type": "system", "subtype": "init", "plugins": [], "mcp_servers": []}
-            result = {"type": "result", "total_cost_usd": cost, "num_turns": 4, "usage": {"input_tokens": 9}}
+            result = {"type": "result", "total_cost_usd": cost, "num_turns": 4,
+                      "usage": usage if usage is not None else {"input_tokens": 9}}
             if log != "ok":
                 result["subtype"] = log
             (trial / "agent" / "claude-code.txt").write_text(json.dumps(init) + "\n" + json.dumps(result) + "\n")
@@ -365,6 +366,91 @@ def test_failure_checklist(tmp_path: Path) -> None:
         assert row["transcript"].endswith("/agent/claude-code.txt") and Path(row["transcript"]).is_file()
         assert row["trial"]
     assert "## 9. Lista de revisión de fallas" in (lab.rdir / "report.md").read_text()
+
+
+def test_sensitivity_exclusion_policies_are_descriptive(tmp_path: Path) -> None:
+    lab = Lab(tmp_path, ["t1"], k=2)
+    lab.block(1)
+    lab.trial("t1", BASE, 2)
+    lab.trial("t1", PLACEBO, 2)
+    lab.trial("t1", HARNESS, 2, log="none")
+    lab.trial("t1", HARNESS, 2, attempt=2)
+
+    report = lab.report()
+    rows = report["sensitivity"]
+    assert {r["scenario"] for r in rows} == {"infra_as_failure", "drop_task_block_pair", "no_retries"}
+    assert all("p_raw" not in r and "p_holm" not in r and "interval" not in r for r in rows)
+    infra = next(r for r in rows if r["scenario"] == "infra_as_failure" and r["variant"] == HARNESS
+                 and r["endpoint"] == "success")
+    assert infra["estimate"] == pytest.approx(-1 / 3)
+    dropped = next(r for r in rows if r["scenario"] == "drop_task_block_pair" and r["variant"] == HARNESS
+                   and r["endpoint"] == "success")
+    assert dropped["estimate"] == 0 and dropped["n_tasks"] == 1
+    assert "fuera de la familia Holm" in (lab.rdir / "report.md").read_text()
+
+
+def test_sensitivity_infra_is_bad_behavior_but_not_success_or_free_cost(tmp_path: Path) -> None:
+    lab = Lab(tmp_path, ["t1"])
+    lab.trial("t1", BASE)
+    lab.trial("t1", PLACEBO)
+    lab.trial("t1", HARNESS, log="none")
+    lab.trial("t1", HARNESS, attempt=2)
+
+    rows = {r["endpoint"]: r for r in lab.report()["sensitivity"]
+            if r["scenario"] == "infra_as_failure" and r["variant"] == HARNESS}
+    assert rows["behavior"]["estimate"] == pytest.approx(0.5)
+    assert rows["success"]["estimate"] == pytest.approx(-0.5)
+    assert rows["cost"]["estimate"] == pytest.approx(0)
+    assert all(row["n_tasks"] == 1 for row in rows.values())
+
+
+def test_block_scores_count_kept_and_excluded(tmp_path: Path) -> None:
+    lab = Lab(tmp_path, ["t1"], k=2)
+    lab.block(1)
+    lab.trial("t1", BASE, 2)
+    lab.trial("t1", PLACEBO, 2)
+    lab.trial("t1", HARNESS, 2, log="none")
+    lab.trial("t1", HARNESS, 2, attempt=2, reward={"reward": 0})
+
+    report = lab.report()
+    row = next(r for r in report["block_scores"] if r["block"] == 2 and r["variant"] == HARNESS)
+    assert row == {"block": 2, "variant": HARNESS, "successes": 0, "n_valid": 1, "excluded": 1}
+    assert "Entre corridas, no incluye muestreo de tareas" in (lab.rdir / "report.md").read_text()
+
+
+def test_token_totals_by_variant_and_task(tmp_path: Path) -> None:
+    lab = Lab(tmp_path, ["t1", "t2"])
+    lab.trial("t1", BASE, usage={"input_tokens": 3, "output_tokens": 4,
+                                 "cache_read_input_tokens": 5, "cache_creation_input_tokens": 6})
+    lab.trial("t1", PLACEBO)
+    lab.trial("t1", HARNESS, usage={"input_tokens": 7, "output_tokens": 8})
+    lab.trial("t2", BASE)
+    lab.trial("t2", PLACEBO)
+    lab.trial("t2", HARNESS, usage={"input_tokens": 2, "output_tokens": 1})
+
+    report = lab.report()
+    assert report["token_totals"]["by_variant"][HARNESS] == {
+        "input": 9, "output": 9, "cache_read": 0, "cache_write": 0}
+    assert report["token_totals"]["by_task"]["t1"] == {
+        "input": 19, "output": 12, "cache_read": 5, "cache_write": 6}
+    assert "Tokens totales" in (lab.rdir / "report.md").read_text()
+
+
+def test_failure_modes_are_manual_and_infra_is_sampled(tmp_path: Path) -> None:
+    lab = Lab(tmp_path, ["t1"])
+    lab.trial("t1", BASE)
+    lab.trial("t1", PLACEBO)
+    lab.trial("t1", HARNESS, log="none")
+    lab.trial("t1", HARNESS, attempt=2, reward={"reward": 0})
+
+    report = lab.report()
+    assert report["failure_modes"] == ["agent", "insufficient instruction", "narrow verifier",
+                                       "broad verifier", "near miss", "time cut", "infra"]
+    rows = report["failures_to_review"]
+    assert {r["reason"] for r in rows} == {"infra", "falla"}
+    assert all(r["mode"] is None for r in rows)
+    assert sum(r["second_reading_sample"] for r in rows) == 1
+    assert "segunda lectura" in (lab.rdir / "report.md").read_text()
 
 
 # Covers: R36
