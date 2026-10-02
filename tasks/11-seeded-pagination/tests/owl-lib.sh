@@ -36,10 +36,35 @@
 # pkill (procps), timeout (coreutils), git, node. Caller runs as root (default [verifier] user).
 
 set -u
+# The verifier is root; never resolve its tools through an agent-controlled PATH.
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Fixed mount point Harbor gives the verifier phase for this task's tests/ directory
 # (confirmed empirically: tasks/00-smoke's test.sh already reads /tests/<file> this way).
 OWL_TESTS_DIR="/tests"
+
+# A symlink in any path component must not make root read or overwrite outside /app.
+_owl_regular_in_app() {
+  local path="$1" parent
+  parent=$(dirname "$path")
+  [ -f "$path" ] && [ ! -L "$path" ] &&
+    [ "$(realpath -e "$parent" 2>/dev/null)" = "$parent" ]
+}
+
+# Zombies can persist under Docker's test entrypoint; only live node-owned processes matter.
+_owl_kill_agent_processes() {
+  local uid attempt
+  uid=$(id -u node) || exit 1
+  for attempt in {1..20}; do
+    pkill -KILL -u node >/dev/null 2>&1 || true
+    if ! ps -eo uid=,stat= | awk -v uid="$uid" '$1 == uid && $2 !~ /^Z/ { found=1 } END { exit !found }'; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  printf 'owl: live agent processes remain after kill loop\n' >&2
+  exit 1
+}
 
 # _owl_git: every remaining git call funnels through here (D6.2 + review finding
 # 2026-09-24: `git update-index --assume-unchanged`/`--skip-worktree`, plain plumbing
@@ -141,7 +166,11 @@ owl_snapshot() {
 # /logs/verifier before a single-step shared-mode verifier, so a still-running
 # agent process could otherwise plant or keep rewriting reward.json underneath us.
 owl_begin() {
-  pkill -KILL -u node >/dev/null 2>&1 || true
+  # The mount is verifier-only, but surviving agent processes must not read it.
+  [ -d "$OWL_TESTS_DIR" ] && [ ! -L "$OWL_TESTS_DIR" ] &&
+    [ "$(realpath -e "$OWL_TESTS_DIR" 2>/dev/null)" = "$OWL_TESTS_DIR" ] &&
+    chmod -R go-rwx -- "$OWL_TESTS_DIR" || exit 1
+  _owl_kill_agent_processes
   rm -rf /logs/verifier
   mkdir -p /logs/verifier
   # Fail-closed stub: if the verifier dies before owl_finish, Harbor reads this and
@@ -379,7 +408,7 @@ _owl_test_line_counts() {
   base_tmp=$(mktemp)
   _owl_git cat-file -p "$OWL_BASELINE:$rel" > "$base_tmp" 2>/dev/null || : > "$base_tmp"
   cur="/app/$rel"
-  { [ -f "$cur" ] && [ ! -L "$cur" ]; } || cur=/dev/null
+  _owl_regular_in_app "$cur" || cur=/dev/null
   d=$(diff "$base_tmp" "$cur" 2>/dev/null || true)
   rm -f "$base_tmp"
   added=$(printf '%s\n' "$d" | grep -c '^> ' || true)
@@ -428,6 +457,10 @@ owl_restore_pristine() {
     if [ "$is_test" = "1" ]; then
       OWL_PRISTINE_FILES="$OWL_PRISTINE_FILES$f
 "
+    fi
+    if [ -L "/app/$f" ] || [ "$(realpath -e "$(dirname "/app/$f")" 2>/dev/null)" != "$(dirname "/app/$f")" ]; then
+      OWL_BASELINE_VALID=0
+      return 1
     fi
     _owl_git cat-file -p "$OWL_BASELINE:$f" > "/app/$f" 2>/dev/null || true
   done <<EOF
@@ -572,7 +605,7 @@ owl_run_node_tests() {
       node --import "$OWL_GUARD_FILE" --test --test-reporter=tap "$f" > "$tap" 2>> "$log"
     rc=$?
     if [ "$rc" = 124 ] || [ "$rc" = 137 ]; then OWL_TEST_TIMED_OUT=1; fi
-    pkill -KILL -u node >/dev/null 2>&1 || true
+    _owl_kill_agent_processes
     cat "$tap" >> "$log"
     reason=$(_owl_tap_check "$tap" "$rc" "$f")
     rm -f "$tap"
@@ -690,6 +723,7 @@ owl_typecheck() {
 # (deletions aren't relevant to any M1-M6 marker, which all key on lines ADDED).
 _owl_added_lines() {
   local rel="$1" base_tmp
+  _owl_regular_in_app "/app/$rel" || return 0
   base_tmp=$(mktemp)
   _owl_git cat-file -p "$OWL_BASELINE:$rel" > "$base_tmp" 2>/dev/null || : > "$base_tmp"
   diff "$base_tmp" "/app/$rel" 2>/dev/null | sed -n 's/^> //p'
@@ -1003,7 +1037,7 @@ owl_dim() {
 # that would call owl_dim never ran) reads as "" via the `:-` default, which never equals
 # "1", so reward is zeroed rather than the dimension being silently ignored.
 owl_finish() {
-  pkill -KILL -u node >/dev/null 2>&1 || true
+  _owl_kill_agent_processes
 
   local reward=0
   if [ "$OWL_BASELINE_VALID" = "1" ]; then

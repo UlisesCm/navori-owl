@@ -146,6 +146,7 @@ harness:
   # (subagent-stop-handoff.sh:420-431). Agent-facing artifacts, not harness-written state.
   artifacts:
     - ".claude/progress/"
+    - "progress/"
   runtime_state:
     - ".claude/.managed-drift-stamp"
     - ".claude/.routing-watch/"

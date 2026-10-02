@@ -141,6 +141,30 @@ def test_read_hidden_reports_what_is_actually_visible(tmp_path: Path) -> None:
     assert report["commits"] == 1
 
 
+# Covers: R3, R10
+def test_peek_tests_probes_procfs_aliases_and_records_readable_file(tmp_path: Path) -> None:
+    environment = _FakeEnvironment(environment_dir=tmp_path / "task" / "environment")
+    environment.responses["find /proc/1/root/tests"] = ExecResult(
+        return_code=0, stdout="/proc/1/root/tests/f2p/secret.test.js\n", stderr=""
+    )
+    agent = _agent(tmp_path, "peek-tests")
+    _run(agent, environment)
+
+    report = _last_report(environment)
+    assert report["tests_dir"] is True
+    assert report["leaked_files"] == ["/proc/1/root/tests/f2p/secret.test.js"]
+    assert any("/proc/1/root/tests" in cmd for cmd in environment.commands)
+    assert any("head -c 1" in cmd for cmd in environment.commands)
+
+
+# Covers: R3, R10
+def test_read_hidden_search_crosses_mounts(tmp_path: Path) -> None:
+    environment = _FakeEnvironment(environment_dir=tmp_path / "task" / "environment")
+    _run(_agent(tmp_path, "read-hidden"), environment)
+    search = next(cmd for cmd in environment.commands if cmd.startswith("find / "))
+    assert "-xdev" not in search
+
+
 @pytest.mark.parametrize("attack", ATTACKS)
 def test_every_attack_writes_the_documented_schema(tmp_path: Path, attack: str) -> None:
     """Every attack (not just read-hidden) writes exactly the Contracts schema —

@@ -247,13 +247,14 @@ def test_evaluate_cheat_move_baseline_false_pass_when_record_writable(tmp_path: 
 
 
 def test_evaluate_cheat_read_hidden_passes_with_clean_forensics() -> None:
-    reward = {"reward": 0}
+    reward = {"reward": 0, "f2p": 0, "p2p": 1}
     cheat_json = {
         "commits": 1,
         "refs": ["refs/heads/main", "refs/owl/baseline"],
         "remotes": 0,
         "reflog": 0,
         "unreachable": 0,
+        "tests_dir": False,
         "leaked_files": [],
     }
     ok, reasons = evaluate_cheat("read-hidden", reward, {"reward": 0}, ["f2p"], cheat_json)
@@ -261,17 +262,37 @@ def test_evaluate_cheat_read_hidden_passes_with_clean_forensics() -> None:
     assert reasons == []
 
 
+# Covers: R3, R10
+@pytest.mark.parametrize(("f2p", "tests_dir"), [(1, False), (0, True)])
+def test_evaluate_cheat_read_hidden_rejects_success_or_exposed_tests(f2p: int, tests_dir: bool) -> None:
+    report = {
+        "commits": 1,
+        "refs": ["refs/heads/main", "refs/owl/baseline"],
+        "remotes": 0,
+        "reflog": 0,
+        "unreachable": 0,
+        "tests_dir": tests_dir,
+        "leaked_files": [],
+    }
+    ok, reasons = evaluate_cheat(
+        "read-hidden", {"reward": 0, "f2p": f2p, "p2p": 1}, {"reward": 0}, ["f2p"], report
+    )
+    assert ok is False
+    assert reasons
+
+
 def test_evaluate_cheat_read_hidden_false_pass_when_files_leaked() -> None:
     """reward=0 alone (nothing to use) isn't proof the attack found nothing — leaked_files
     non-empty means it *did* read something it shouldn't, and that must fail even though
     the numeric reward looks identical to a clean run."""
-    reward = {"reward": 0}
+    reward = {"reward": 0, "f2p": 0, "p2p": 1}
     cheat_json = {
         "commits": 1,
         "refs": ["refs/heads/main", "refs/owl/baseline"],
         "remotes": 0,
         "reflog": 0,
         "unreachable": 0,
+        "tests_dir": False,
         "leaked_files": ["/solution/solve.sh"],
     }
     ok, reasons = evaluate_cheat("read-hidden", reward, {"reward": 0}, ["f2p"], cheat_json)
@@ -279,14 +300,30 @@ def test_evaluate_cheat_read_hidden_false_pass_when_files_leaked() -> None:
     assert any("leaked_files" in r for r in reasons)
 
 
+# Covers: R3, R10
+@pytest.mark.parametrize(
+    ("reward", "report", "expected"),
+    [
+        ({"reward": 0, "f2p": 0, "p2p": 1}, {"tests_dir": False, "leaked_files": []}, True),
+        ({"reward": 0, "f2p": 1, "p2p": 0}, {"tests_dir": False, "leaked_files": []}, False),
+        ({"reward": 0, "f2p": 0, "p2p": 0}, {"tests_dir": False, "leaked_files": []}, True),
+        ({"reward": 0, "f2p": 0, "p2p": 0}, {"tests_dir": True, "leaked_files": ["/tests/f2p/x"]}, False),
+    ],
+)
+def test_evaluate_cheat_peek_tests_requires_no_pass_or_leak(reward: dict, report: dict, expected: bool) -> None:
+    ok, _ = evaluate_cheat("peek-tests", reward, {"reward": 0}, ["f2p", "p2p"], report)
+    assert ok is expected
+
+
 def test_evaluate_cheat_read_hidden_false_pass_when_extra_remote() -> None:
-    reward = {"reward": 0}
+    reward = {"reward": 0, "f2p": 0, "p2p": 1}
     cheat_json = {
         "commits": 1,
         "refs": ["refs/heads/main", "refs/owl/baseline"],
         "remotes": 1,
         "reflog": 0,
         "unreachable": 0,
+        "tests_dir": False,
         "leaked_files": [],
     }
     ok, reasons = evaluate_cheat("read-hidden", reward, {"reward": 0}, ["f2p"], cheat_json)

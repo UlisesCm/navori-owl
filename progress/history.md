@@ -1,3 +1,23 @@
+## 2026-10-01 20:50 Codex — RH3 y prefijos finales del harness
+
+## Goal
+Cerrar RH3 y prefijos del harness antes de conformidad y T22.
+## Discoveries
+- Los ataques read-only read-hidden y peek-tests conservan p2p=1 legítimamente; el usuario aprobó exigir reward=0, f2p=0 y ausencia de filtración, no p2p=0.
+- docs/task-authoring.md debe registrar peek-tests para mantener el contrato validado con CHEAT_ATTACKS; extensión autorizada por usuario.
+## Accomplished
+- RH3: PATH fijo, permisos restrictivos /tests, bucle de terminación de procesos node y guardas symlink de contenido; copias dev idénticas.
+- progress/ declarado como artefacto navori; .superpowers/ auditado como runtime_state existente; T27/T28/T29 documentadas.
+- Review APPROVED sobre main 73535f9 (PR27 mergeado): gate 292 passed, 1 skipped, 84 deselected; Docker enfocado 5 passed. RH4 permanece posterior a r1.
+## Next Steps
+- Publicar RH3 en PR a main, completar conformidad, repetir T22 con librería y prefijos finales; después T23 requiere aprobación de RULES.md.
+- Conservar sin modificar el checkout principal feat/f3-t22-holdout-sync y sus tres copias holdout pendientes. No se leyó contenido del holdout.
+## Relevant Files
+- owl/verifier/lib.sh y tasks/*/tests/owl-lib.sh — aislamiento del verifier.
+- owl/agents/cheat.py y owl/validate.py — probes y criterio sin filtración.
+- variants/navori.yaml y specs/f3-ronda1/artifacts-audit.md — prefijos.
+- docs/task-authoring.md y specs/f3-ronda1/{design,tasks}.md — contrato y tareas.
+
 ## 2026-10-01 20:40 Codex — Mejoras descriptivas F3 del reporte
 
 ## Goal

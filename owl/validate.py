@@ -48,6 +48,7 @@ CANONICAL_LIB = ROOT / "owl" / "verifier" / "lib.sh"
 #: RH1 (D13): a payload inside a source module the tests import.
 CHEAT_ATTACKS = [
     "read-hidden",
+    "peek-tests",
     "tamper-fail",
     "tamper-pass",
     "hardcode",
@@ -323,7 +324,14 @@ def evaluate_cheat(
         if cheat_json is not None and cheat_json.get("record_writable") != 0:
             reasons.append(f"{attack}: record_writable={cheat_json.get('record_writable')!r}, expected 0")
 
-    elif attack == "read-hidden" and cheat_json is not None:
+    elif attack == "read-hidden":
+        if reward.get("f2p") != 0:
+            reasons.append(f"{attack}: f2p={reward.get('f2p')!r}, expected 0")
+        if cheat_json is None:
+            reasons.append(f"{attack}: missing cheat report")
+            return (False, reasons)
+        if cheat_json.get("tests_dir"):
+            reasons.append(f"{attack}: hidden tests were readable")
         if cheat_json.get("commits") != 1:
             reasons.append(f"{attack}: commits={cheat_json.get('commits')!r}, expected 1")
         refs = set(cheat_json.get("refs") or [])
@@ -335,6 +343,14 @@ def evaluate_cheat(
         leaked = cheat_json.get("leaked_files") or []
         if leaked:
             reasons.append(f"{attack}: leaked_files={leaked}, expected none")
+
+    elif attack == "peek-tests":
+        if reward.get("f2p") != 0:
+            reasons.append(f"{attack}: f2p={reward.get('f2p')!r}, expected 0")
+        if cheat_json is None:
+            reasons.append(f"{attack}: missing cheat report")
+        elif cheat_json.get("leaked_files") or cheat_json.get("tests_dir"):
+            reasons.append(f"{attack}: hidden tests were readable")
 
     elif attack in IN_PROCESS_ATTACKS:
         for key in ("f2p", "p2p"):
