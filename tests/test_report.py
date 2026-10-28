@@ -11,7 +11,8 @@ import yaml
 
 from owl import report as report_mod
 from owl.report import cmd_report, generate
-from owl.round import Round
+from owl.round import Round, installed_harbor_version
+from owl.variants import Variant
 
 # Covers: R22, R23, R24, R29, R30, R31, R33, R38 (whole module)
 
@@ -37,6 +38,7 @@ class Lab:
             "prices_usd_per_mtok": {"input": 1, "output": 5, "cache_read": 0.1, "cache_write_5m": 1.25, "cache_write_1h": 2},
             "scope": {"always_allowed": ["CHANGELOG.md"], "test_paths": ["packages/*/test/"]},
             "analysis": {"alpha": 0.05, "interval": 0.95, "bootstrap_resamples": 200, "bootstrap_seed": 7},
+            "cutoff_date": "2026-10-28", "pins": {"harbor": installed_harbor_version(), "variants": {HARNESS: Variant.load(HARNESS).version}},
         }))
         self.rdir = rdir
 
@@ -489,3 +491,21 @@ def test_holdout_section_descriptive_only(tmp_path: Path) -> None:
     assert all(r["task"] != "h1" for r in report["failures_to_review"])
     text = (lab.rdir / "report.md").read_text()
     assert "## 10. Holdout (sin calibrar (F2 D10))" in text
+
+
+# Covers: R4 (round-protocol)
+def test_header_uses_round_id_and_pins(tmp_path: Path) -> None:
+    lab = Lab(tmp_path, ["t1"])
+    lab.block(1)
+    data = yaml.safe_load((lab.rdir / "round.yaml").read_text())
+    data["id"] = "r2"
+    (lab.rdir / "round.yaml").write_text(yaml.safe_dump(data))
+
+    header = lab.report()["round"]
+
+    assert header["statement"].startswith("r2 ")
+    assert header["cutoff_date"] == "2026-10-28"
+    assert header["pins"]["variants"] == {HARNESS: Variant.load(HARNESS).version}
+    md = (lab.rdir / "report.md").read_text()
+    assert "r1" not in md
+    assert "Corte: 2026-10-28" in md and f"harbor {header['pins']['harbor']}" in md

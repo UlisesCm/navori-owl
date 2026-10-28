@@ -17,6 +17,7 @@ CACHE_DIR = ROOT / ".owl-cache"
 PATIENT_DIR = ROOT / "patient"
 
 _FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_UPSTREAM_RE = re.compile(r"^(?:(?:pypi|npm):\S+|github-(?:release|commit):[\w.-]+/[\w.-]+)$")
 
 
 def _check_artifact_prefix(variant_id: str, prefix: str) -> None:
@@ -35,6 +36,23 @@ def _check_artifact_prefix(variant_id: str, prefix: str) -> None:
             problem = "contains a file of patient/"
     if problem:
         raise SystemExit(f"Variant '{variant_id}': artifacts prefix '{prefix}' {problem}.")
+
+
+def _harness_release(variant_id: str, harness: dict[str, Any], installs: bool) -> tuple[str | None, str | None]:
+    """round-protocol R2: `harness.version` and `harness.upstream`, required when the variant installs a harness."""
+    version = harness.get("version")
+    upstream = harness.get("upstream")
+    if installs and (not version or not upstream):
+        raise SystemExit(
+            f"Variant '{variant_id}': a variant with plugins or init must declare harness.version "
+            "and harness.upstream."
+        )
+    if upstream is not None and not _UPSTREAM_RE.match(str(upstream)):
+        raise SystemExit(
+            f"Variant '{variant_id}': harness.upstream '{upstream}' must be pypi:<name>, npm:<name>, "
+            "github-release:<owner>/<repo> or github-commit:<owner>/<repo>."
+        )
+    return (str(version) if version is not None else None, str(upstream) if upstream is not None else None)
 
 
 @dataclass
@@ -58,6 +76,8 @@ class Variant:
     append_system_prompt: str | None = None
     artifacts: list[str] = field(default_factory=list)
     expect: dict[str, list[str]] = field(default_factory=dict)
+    version: str | None = None
+    upstream: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -79,6 +99,7 @@ class Variant:
         for prefix in artifacts:
             _check_artifact_prefix(variant_id, prefix)
         append_prompt = harness.get("append_system_prompt")
+        version, upstream = _harness_release(variant_id, harness, bool(plugins or harness.get("init")))
         return cls(
             id=data["id"],
             description=data.get("description", ""),
@@ -92,6 +113,8 @@ class Variant:
             append_system_prompt=str(append_prompt) if append_prompt is not None else None,
             artifacts=artifacts,
             expect={k: list(v or []) for k, v in (data.get("expect") or {}).items()},
+            version=version,
+            upstream=upstream,
             raw=data,
         )
 

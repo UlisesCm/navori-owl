@@ -51,6 +51,8 @@ def _write_round(root: Path, **over) -> Path:
         "tasks": ["tasks/t1"],
         "prices_usd_per_mtok": dict(PRICES),
         "limits": dict(LIMITS),
+        "cutoff_date": "2026-10-28",
+        "pins": {"harbor": rnd.installed_harbor_version(), "variants": {}},
     }
     data.update(over)
     rdir = root / "rounds" / "r1"
@@ -513,3 +515,53 @@ def test_load_rejects_invalid_limits(env, patch, match):
     limits = {k: v for k, v in limits.items() if v is not None}
     with pytest.raises(SystemExit, match=match):
         rnd.Round.load(_write_round(env, limits=limits), root=env)
+
+
+# Covers: R1, R3 (round-protocol)
+def test_round_refuses_harbor_mismatch(env, monkeypatch):
+    monkeypatch.setattr(rnd, "installed_harbor_version", lambda: "0.25.0")
+    rdir = _write_raw_round(env, pins={"harbor": "0.23.0", "variants": {}})
+    with pytest.raises(SystemExit, match="harbor: pinned 0.23.0 but installed 0.25.0"):
+        rnd.Round.load(rdir, root=env)
+    rdir = _write_raw_round(env, cutoff_date=None)
+    with pytest.raises(SystemExit, match="cutoff_date"):
+        rnd.Round.load(rdir, root=env)
+    rdir = _write_raw_round(env, cutoff_date="28/10/2026")
+    with pytest.raises(SystemExit, match="ISO date"):
+        rnd.Round.load(rdir, root=env)
+
+
+# Covers: R1, R3 (round-protocol)
+def test_round_lists_every_pin_mismatch(env, monkeypatch):
+    monkeypatch.setattr(rnd, "installed_harbor_version", lambda: "0.25.0")
+    for vid, version in (("a", "1.1"), ("b", "2.0")):
+        (env / "variants" / f"{vid}.yaml").write_text(yaml.safe_dump({
+            "id": vid, "agent_version": "1.0",
+            "harness": {"init": "true", "version": version, "upstream": f"npm:{vid}"},
+        }))
+    rdir = _write_raw_round(env, pins={"harbor": "0.24.0", "variants": {"a": "1.0", "zzz": "9"}})
+    with pytest.raises(SystemExit) as exc:
+        rnd.Round.load(rdir, root=env)
+    message = str(exc.value)
+    for expected in ("harbor: pinned 0.24.0", "a: pinned 1.0 but harness.version is 1.1",
+                     "b: harness.version 2.0 has no pin", "pins.variants.zzz is not a round variant"):
+        assert expected in message
+    rdir = _write_raw_round(env, pins={"harbor": "0.25.0", "variants": {"a": "1.1", "b": "2.0"}})
+    loaded = rnd.Round.load(rdir, root=env)
+    assert loaded.cutoff_date == "2026-10-28"
+    assert loaded.pins == {"harbor": "0.25.0", "variants": {"a": "1.1", "b": "2.0"}}
+
+
+# Covers: R7, R8 (round-protocol)
+def test_plan_refuses_burned_holdout(plan_env, capsys):
+    round_def = _plan_round(plan_env)
+    kw = {"root": plan_env, "holdout_dir": plan_env / "holdout"}
+    (plan_env / "holdout" / "burned.yaml").write_text("[]\n")
+    assert any(t["task"] == "holdout/h1" for t in rnd.build_plan(round_def, holdout=True, **kw)["trials"])
+    (plan_env / "holdout" / "burned.yaml").write_text(
+        yaml.safe_dump([{"task": "holdout/h1", "round": "r1", "revealed": "2026-11-15"}])
+    )
+    with pytest.raises(SystemExit) as exc:
+        rnd.build_plan(round_def, holdout=True, **kw)
+    assert exc.value.code == 2 and "holdout/h1" in capsys.readouterr().err
+    assert "holdout/h1" not in {t["task"] for t in rnd.build_plan(round_def, **kw)["trials"]}

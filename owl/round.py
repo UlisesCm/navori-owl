@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import datetime
 import hashlib
+import importlib.metadata
 import json
 import random
 import subprocess
@@ -14,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from owl.tasks import HOLDOUT_DIR, exit_refused, refuse_holdout
+from owl.tasks import HOLDOUT_DIR, burned_tasks, exit_refused, refuse_holdout
 from owl.variants import ROOT, Variant
 
 LIMIT_KEYS = ("agent_timeout_multiplier", "agent_setup_timeout_multiplier", "max_turns", "max_budget_usd")
@@ -37,6 +39,8 @@ class Round:
     artifacts: list[str] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict)
     limits: dict[str, Any] = field(default_factory=dict)
+    cutoff_date: str = ""
+    pins: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def load(cls, round_dir: Path | str, root: Path = ROOT) -> Round:
@@ -71,8 +75,10 @@ class Round:
 
         limits = _validate_limits(path, data)
         artifacts: list[str] = []
+        loaded: list[Variant] = []
         for vid in variant_ids:
             variant = Variant.load(vid)  # exits on an unknown variant
+            loaded.append(variant)
             if variant.agent_version != agent_version:
                 raise SystemExit(
                     f"{path}: variant '{vid}' agent_version {variant.agent_version!r} "
@@ -81,6 +87,7 @@ class Round:
             for prefix in variant.artifacts:
                 if prefix not in artifacts:
                     artifacts.append(prefix)
+        cutoff_date, pins = _validate_pins(path, data, loaded)
         return cls(
             id=str(data["id"]),
             dir=round_dir,
@@ -94,7 +101,48 @@ class Round:
             artifacts=artifacts,
             raw=data,
             limits=limits,
+            cutoff_date=cutoff_date,
+            pins=pins,
         )
+
+
+def installed_harbor_version() -> str | None:
+    """The Harbor distribution installed in this environment, or None if it is missing."""
+    try:
+        return importlib.metadata.version("harbor")
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+def _validate_pins(path: Path, data: dict[str, Any], variants: list[Variant]) -> tuple[str, dict[str, Any]]:
+    """round-protocol R1, R3: `cutoff_date` and `pins` match Harbor and every harness; list every mismatch."""
+    cutoff, pins = data.get("cutoff_date"), data.get("pins")
+    if cutoff is None or not isinstance(pins, dict):
+        raise SystemExit(f"{path}: missing required 'cutoff_date' and 'pins' (docs/round-protocol.md)")
+    try:
+        cutoff_date = datetime.date.fromisoformat(str(cutoff)).isoformat()
+    except ValueError:
+        raise SystemExit(f"{path}: cutoff_date {cutoff!r} is not an ISO date (YYYY-MM-DD)") from None
+    problems: list[str] = []
+    installed = installed_harbor_version()
+    if "harbor" not in pins:
+        problems.append("pins.harbor is missing")
+    elif str(pins["harbor"]) != installed:
+        problems.append(f"harbor: pinned {pins['harbor']!s} but installed {installed or 'none'}")
+    variant_pins = {str(k): str(v) for k, v in (pins.get("variants") or {}).items()}
+    ids = {v.id for v in variants}
+    problems += [f"pins.variants.{vid} is not a round variant" for vid in sorted(set(variant_pins) - ids)]
+    for variant in variants:
+        if variant.version is None:
+            continue
+        pinned = variant_pins.get(variant.id)
+        if pinned is None:
+            problems.append(f"{variant.id}: harness.version {variant.version} has no pin")
+        elif pinned != variant.version:
+            problems.append(f"{variant.id}: pinned {pinned} but harness.version is {variant.version}")
+    if problems:
+        raise SystemExit(f"{path}: pins do not match:\n" + "\n".join(f"  - {p}" for p in problems))
+    return cutoff_date, {"harbor": str(pins["harbor"]), "variants": variant_pins}
 
 
 def _validate_limits(path: Path, data: dict[str, Any]) -> dict[str, Any]:
@@ -195,6 +243,11 @@ def round_tasks(
     if holdout:
         found = sorted(p.parent.relative_to(root).as_posix() for p in holdout_dir.glob("*/task.toml"))
         tasks += [t for t in found if t not in tasks]
+        burned = set(burned_tasks(holdout_dir))
+        reused = [t for t in tasks if t in burned]
+        if reused:
+            print(f"Refusing to plan: holdout task(s) already revealed: {', '.join(reused)}", file=sys.stderr)
+            raise SystemExit(2)
     return tasks
 
 
