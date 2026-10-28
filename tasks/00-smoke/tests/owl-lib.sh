@@ -38,6 +38,9 @@
 set -u
 # The verifier is root; never resolve its tools through an agent-controlled PATH.
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Nor through the exec environment's umask (docker exec can hand out 0000): everything the verifier
+# creates (/logs/verifier, copied F2P tests) must never be writable by the node user.
+umask 022
 
 # Fixed mount point Harbor gives the verifier phase for this task's tests/ directory
 # (confirmed empirically: tasks/00-smoke's test.sh already reads /tests/<file> this way).
