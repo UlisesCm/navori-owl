@@ -475,6 +475,8 @@ def sealed_container(patient_image: str, tmp_path: Path):
     name = f"owl-t4-{uuid.uuid4().hex[:10]}"
     _run(["docker", "run", "-d", "--name", name, "--entrypoint", "sleep", tag, "infinity"], timeout=30)
     try:
+        # Harbor mounts /tests for every verifier phase and owl_begin fails closed without it.
+        _docker_exec(name, "mkdir -p /tests", user="root")
         yield name
     finally:
         subprocess.run(["docker", "rm", "-f", name], capture_output=True, text=True, check=False)
@@ -1291,12 +1293,13 @@ def test_repro_state_planted_by_run_1_does_not_survive_to_run_2(
 # Covers: R6
 def test_repro_cannot_read_tests_or_verifier_logs(sealed_container: str, tmp_path: Path, attack_src: str) -> None:
     """/tests (fix.patch) and /logs/verifier are root-only while node runs the agent's test, so a
-    repro that branches on them never passes, and the modes are restored afterwards."""
+    repro that branches on them never passes, and the modes are restored afterwards: /tests to
+    owl_begin's owner-only mode (RH3), /logs/verifier to the umask-022 directory owl_begin made."""
     reward = _run_repro_verifier(sealed_container, attack_src, tmp_path)
     assert reward["f2p"] == 0, reward
     assert reward["reward"] == 0, reward
     modes = _docker_exec(sealed_container, "stat -c '%a' /tests /logs/verifier").split()
-    assert modes == ["755", "755"], modes
+    assert modes == ["700", "755"], modes
 
 
 @pytest.mark.parametrize("attack_src", [_MTIME_AGE_TEST, _CTIME_AGE_TEST], ids=["app-mtime-age", "app-ctime-age"])

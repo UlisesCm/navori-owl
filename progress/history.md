@@ -1,3 +1,19 @@
+## 2026-10-28 16:30 Pi — Suite docker de nuevo en verde: umask del verifier y fixture con /tests
+
+## Goal
+Dejar la suite docker completa en verde en main antes de r1-refresco E1 M1 (Harbor 0.25.0).
+## Discoveries
+- 24 tests docker fallaban en main desde RH3 (#28), cuyo review solo corrió 5 docker enfocados: sealed_container no creaba /tests y owl_begin hace exit 1 sin él.
+- docker exec (OrbStack) entrega umask 0000: /logs/verifier quedaba 0777 y las copias F2P 0666.
+## Accomplished
+- lib.sh fija umask 022 al cargarse; copias idénticas en tasks/*/tests/owl-lib.sh.
+- sealed_container crea /tests como root (como el mount de Harbor); el test de repro espera 700 en /tests (RH3) y 755 en /logs/verifier.
+- Gate: ruff check . && uv run pytest -m 'not docker' → 310 passed; uv run pytest -q -m docker → 85 passed (Harbor 0.23.0).
+## Next Steps
+- Mergear; rebase de feat/r1-refresco-e1 (Harbor 0.25.0) y suite completa para M1.
+## Relevant Files
+- owl/verifier/lib.sh, tasks/*/tests/owl-lib.sh, tests/test_validate_docker.py.
+
 ## 2026-10-28 15:10 Pi — Fix de permisos de los tests F2P del verifier
 
 ## Goal
