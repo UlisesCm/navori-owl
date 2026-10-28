@@ -144,15 +144,15 @@ harness:
     # line every patient revision carries right after the intro paragraph.
     grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/CLAUDE.md || { echo "navori: base CLAUDE.md content missing after init+render" >&2; exit 1; }
     grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/AGENTS.md || { echo "navori: base AGENTS.md content missing after init+render" >&2; exit 1; }
-  # source: navori@0.10.0 agents write plans and handoff notes under .claude/progress/
-  # (auditor.md:75, implementer.md:81, orchestrator.md:110-122); the hooks only read them
-  # (subagent-stop-handoff.sh:420-431). Agent-facing artifacts, not harness-written state.
+  # source (r1 cutoff audit, specs/f3-ronda1/artifacts-audit.md): navori@0.12.3 agents write
+  # handoffs under .navori/state/handoffs/ (implementer.md:17) and the orchestrator writes
+  # progress/; the hooks only read them (subagent-stop-handoff.sh:686). Hook state moved from
+  # .claude/ to .navori/state/hooks/ (managed-drift-watch.sh:702); .claude/worktrees/ stays.
   artifacts:
-    - ".claude/progress/"
+    - ".navori/state/handoffs/"
     - "progress/"
   runtime_state:
-    - ".claude/.managed-drift-stamp"
-    - ".claude/.routing-watch/"
+    - ".navori/state/hooks/"
     - ".claude/worktrees/"
 expect:
   plugins: []

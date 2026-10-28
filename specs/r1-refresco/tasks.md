@@ -11,16 +11,16 @@ Estimated LOC: 300
 
 ### M1 — Harbor 0.25.0
 - **A1** [observable] — La suite completa, docker incluida, pasa sobre Harbor 0.25.0 · `uv run pytest -q` → 0 fallas
-- [ ] **T1** (R1) — `pyproject.toml` y `uv.lock` a `harbor==0.25.0`; `ClaudeCodeHarness` y `CheatAgent` ajustados a la API de 0.25.0 donde cambió (resolución de credenciales del adaptador de Claude Code), sin cambiar su comportamiento · effect: behavior · test: tests/test_validate_docker.py::test_owl_validate_smoke_end_to_end
+- [x] **T1** (R1) — `pyproject.toml` y `uv.lock` a `harbor==0.25.0`; `ClaudeCodeHarness` y `CheatAgent` ajustados a la API de 0.25.0 donde cambió (resolución de credenciales del adaptador de Claude Code), sin cambiar su comportamiento · effect: behavior · test: tests/test_validate_docker.py::test_owl_validate_smoke_end_to_end
 
 ### M2 — Agente y variantes al corte
 - **A2** [observable] — Las variantes de la ronda cargan con `agent_version` 2.1.312 y los pins del corte, y navori, superpowers y ponytail se instalan sobre el paciente con su centinela y su `expect` · `uv run pytest tests/test_variants.py tests/test_validate_docker.py -q -k "navori or superpowers or ponytail or agent_version"` → todas pasan
-- [ ] **T2** (R1) — `agent_version: "2.1.312"` en `vanilla-default`, `navori`, `gentle-ai`, `superpowers`, `ponytail` y `placebo`, con `harness.version` y `harness.upstream` donde haya harness · effect: schema · test: tests/test_variants.py::test_round_variants_share_agent_version
-- [ ] **T3** (R1, R2) — `navori.yaml` a navori 0.12.3 con la versión de engram que espere su instalador; `superpowers.yaml` a v7.0.1 (`2ce8aa15d05bd57213e6f746f953aafb7ded7a8b`); `ponytail.yaml` a `09c434ab73ca43761c5d8b0c5d341926c2fba710`; `expect` y centinelas confirmados contra la instalación real · effect: behavior · test: tests/test_validate_docker.py::test_navori_install_on_patient
+- [x] **T2** (R1) — `agent_version: "2.1.312"` en `vanilla-default`, `navori`, `gentle-ai`, `superpowers`, `ponytail` y `placebo`, con `harness.version` y `harness.upstream` donde haya harness · effect: schema · test: tests/test_variants.py::test_round_variants_share_agent_version
+- [x] **T3** (R1, R2) — `navori.yaml` a navori 0.12.3 con la versión de engram que espere su instalador; `superpowers.yaml` a v7.0.1 (`2ce8aa15d05bd57213e6f746f953aafb7ded7a8b`); `ponytail.yaml` a `09c434ab73ca43761c5d8b0c5d341926c2fba710`; `expect` y centinelas confirmados contra la instalación real · effect: behavior · test: tests/test_validate_docker.py::test_navori_install_on_patient
 
 ### M3 — Prefijos al corte
 - **A3** [observable] — Cada prefijo de navori, superpowers y ponytail a la versión del corte tiene fila con evidencia y veredicto · `uv run pytest tests/test_variants.py -q -k artifacts_audit` → pasa
-- [ ] **T4** (R3) — Spike corto de superpowers v7.0.1 (rutas que escriben brainstorming y sus hooks) y auditoría de prefijos de navori, superpowers y ponytail por un `auditor` en contexto fresco, con los criterios de T14 de F3; un prefijo rechazado sale del manifiesto · effect: docs · test: tests/test_variants.py::test_artifacts_audit_has_one_row_per_declared_prefix
+- [x] **T4** (R3) — Spike corto de superpowers v7.0.1 (rutas que escriben brainstorming y sus hooks) y auditoría de prefijos de navori, superpowers y ponytail por un `auditor` en contexto fresco, con los criterios de T14 de F3; un prefijo rechazado sale del manifiesto · effect: docs · test: tests/test_variants.py::test_artifacts_audit_has_one_row_per_declared_prefix
 
 ## E2 — gentle-ai v4 y modelo
 Estimated LOC: 250

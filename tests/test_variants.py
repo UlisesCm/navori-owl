@@ -49,10 +49,11 @@ def test_artifacts_prefix_rules(fake_repo: Path, prefix: str) -> None:
 # Covers: R7, R8, R9
 def test_navori_progress_is_artifact() -> None:
     v = Variant.load("navori")
-    assert ".claude/progress/" in v.artifacts
+    assert ".navori/state/handoffs/" in v.artifacts
     assert "progress/" in v.artifacts
     assert "progress/" not in v.runtime_state
-    assert ".claude/progress/" not in v.runtime_state
+    assert ".navori/state/handoffs/" not in v.runtime_state
+    assert ".navori/state/hooks/" in v.runtime_state
     assert ".claude/worktrees/" in v.runtime_state
 
 
