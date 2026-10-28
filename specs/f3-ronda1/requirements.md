@@ -6,7 +6,7 @@ contaminación y `owl summary`, pero no puede correr una ronda comparativa hones
 variantes (`gentle-ai`, `placebo`), condiciones idénticas entre variantes (preámbulo, límites,
 artefactos de metodología), un planificador que aguante ~450 trials con la suscripción, la
 estadística pareada de VISION §9, el pre-registro (`RULES.md`) y el protocolo del holdout. F3 entrega
-la ronda 1 con 6 variantes, k = 5 y Haiku 4.5, y su criterio de salida: reporte completo y
+la ronda 1 con 6 variantes, k = 5 y Haiku 5.5 (revisión 4), y su criterio de salida: reporte completo y
 transcripts de las fallas revisados (VISION §13).
 
 Revisión 2 (2026-09-29), después de `.claude/progress/challenge_f3.md` y de las decisiones del
@@ -21,17 +21,25 @@ contra el piloto; las notas nuevas en rutas no declaradas salen del compuesto; `
 solo líneas de chequeo; telemetría de gentle-ai apagada; sincronización del holdout como tarea
 explícita. La numeración de R no cambió respecto de la revisión 2.
 
+Revisión 4 (2026-10-28), con decisión del usuario: antes del pre-registro, la ronda se refresca a las
+versiones vigentes en una fecha de corte (Harbor 0.25.0, Claude Code 2.1.312, navori 0.12.3,
+superpowers v7.0.1, gentle-ai v4.3.1, ponytail al commit vigente) y el modelo pasa a Haiku 5.5, que
+ya es el Haiku por defecto de la API y cuesta una décima parte. Cambian R1, R6 y R25; entra R40. El
+refresco y el piloto con el modelo nuevo son su propio spec, `specs/r1-refresco/`; el corte, los pins y
+el registro de holdout quemado se apoyan en `specs/round-protocol/`. La
+numeración de R1–R39 no cambió.
+
 ## Requirements (EARS)
 
 ### Ronda y pre-registro
-- **R1** — The round SHALL be defined by `rounds/r1/RULES.md`, `rounds/r1/round.yaml` and `rounds/r1/preamble.md`, where `round.yaml` fixes the model (`anthropic/claude-haiku-4-5-20251001`), the agent version, the six variants (`vanilla-default`, `navori`, `gentle-ai`, `superpowers`, `ponytail`, `placebo`), the baseline (`vanilla-default`), the placebo, the dev task list, k = 5, the seeds, the concurrency (2), the retry count, the limits, the network policy (public), the budget (`250` USD API-equivalent), the stop thresholds, the prices used to estimate a missing trial cost (including separate 5-minute and 1-hour cache-write prices) and the analysis parameters.
+- **R1** — The round SHALL be defined by `rounds/r1/RULES.md`, `rounds/r1/round.yaml` and `rounds/r1/preamble.md`, where `round.yaml` fixes the model (`anthropic/claude-haiku-5-5`), the cutoff date and the pins of `specs/round-protocol/` R1, the agent version, the six variants (`vanilla-default`, `navori`, `gentle-ai`, `superpowers`, `ponytail`, `placebo`), the baseline (`vanilla-default`), the placebo, the dev task list, k = 5, the seeds, the concurrency (2), the retry count, the limits, the network policy (public), the budget (`250` USD API-equivalent), the stop thresholds, the prices used to estimate a missing trial cost (including separate 5-minute and 1-hour cache-write prices) and the analysis parameters.
 - **R2** — `RULES.md` SHALL declare the two primary endpoints (cost and behavior violations) with their test, their single multiplicity family and the decision rule; the descriptive reading of success; the expected sensitivity of each primary endpoint; the behavior indicator table with polarity and family, the check-line pattern of `test_weakened` and the notes-only exception of `scope_violation`; the methodology-artifact paths and their audit; the exclusion and re-run rules; the retention of 0/k and k/k tasks; the budget rule as the only early stop; the holdout protocol; the network policy; the limits; the install-route disclosures (for `navori`, the `init --yes` `coexist` route with a reference to "issue upstream (link pending)"); the telemetry disclosures (gentle-ai telemetry disabled by `GENTLE_AI_TELEMETRY=0`); the conflict of interest and the conditions that invalidate the round.
 - **R3** — IF `owl run --round` starts while `rounds/r1/` or any tracked path under `tasks/`, `holdout/`, `variants/`, `owl/` or `patient/` differs from the committed tree, THEN owl SHALL refuse to launch any trial (exit 2) and list the dirty paths.
 - **R4** — IF a round variant declares an `agent_version` different from the round's, or a round task or variant does not exist, THEN owl SHALL refuse to plan the round.
 - **R5** — WHEN `owl run --round` launches a trial, owl SHALL record in the job's `owl-variant.json` the round id, the commit SHA, the sha256 of `RULES.md`, `round.yaml` and `preamble.md`, the block, the attempt and the round's artifact list.
 
 ### Variantes
-- **R6** — The system SHALL provide a `gentle-ai` variant that installs a pinned gentle-ai release binary verified against its published checksum, runs `gentle-ai install` non-interactively for `claude-code` with workspace scope and the product defaults (preset `full-gentleman`, its persona, its default SDD mode), sets `GENTLE_AI_TELEMETRY=0` both in the installation environment and in the agent run environment, makes any Claude Code configuration the installer writes outside `/app` available in the trial's `CLAUDE_CONFIG_DIR`, and fails the trial setup when a sentinel check of the installed harness fails.
+- **R6** — The system SHALL provide a `gentle-ai` variant that installs a pinned gentle-ai release binary verified against its published checksum, runs `gentle-ai install` non-interactively for `claude-code` with workspace scope and the product defaults of the pinned release (for v4: preset `full-gentleman`, its persona and ODD, its only development workflow, as confirmed by the spike), sets `GENTLE_AI_TELEMETRY=0` both in the installation environment and in the agent run environment, makes any Claude Code configuration the installer writes outside `/app` available in the trial's `CLAUDE_CONFIG_DIR`, and fails the trial setup when a sentinel check of the installed harness fails.
 - **R7** — The system SHALL provide a `placebo` variant equal to `vanilla-default` plus the sentence "Keep changes minimal and verify your work." appended to the system prompt through the manifest field `harness.append_system_prompt`.
 - **R8** — WHERE a manifest declares `harness.artifacts`, `Variant.load` SHALL accept only path prefixes that end in `/`, lie outside `packages/` and contain no file of `patient/`, and `owl validate` SHALL fail a task (holdout included, reported only by check name) when a file of its `environment/` lies under a declared prefix or references a path under one; WHEN owl runs a round trial, it SHALL pass the union of the round variants' artifact prefixes to every variant, and the Claude Code adapter SHALL append that union as root to the verifier's exclusion record, so files under those prefixes never count as changed, out of scope or against the reward.
 - **R9** — The `navori`, `superpowers` and `gentle-ai` manifests SHALL declare as `harness.artifacts` the narrowest paths where their documented workflows write plans, specs or progress notes, each with its source at the pinned version; `harness.runtime_state` SHALL keep only state the harness writes by itself; and every artifact prefix SHALL pass a fresh-context audit, by an auditor who did not write the manifests, that rejects shared configuration or documentation roots (`.claude/`, `docs/`, the repository root), before `RULES.md` is committed.
@@ -56,7 +64,7 @@ explícita. La numeración de R no cambió respecto de la revisión 2.
 - **R22** — The system SHALL apply one exclusion policy in `owl summary` and `owl report`: `infra` and `contamination` trials are excluded, except that a trial whose only contamination is `baseline_valid = 0` after the agent ran SHALL be kept as a failure and listed as `tampered`.
 - **R23** — Tasks whose results are 0/k or k/k for any variant SHALL remain in the analysis.
 - **R24** — IF the round stopped with an unfinished block, THEN the primary analysis SHALL use only the finished blocks and report the unfinished block's trials apart.
-- **R25** — IF a kept trial has no reported cost, THEN owl SHALL compute its cost from its session transcripts (main and subagent files), taking the usage of the last record of each `message.id` at the round's fixed prices, SHALL mark it as estimated, SHALL NOT use Harbor's estimate for Claude Code trials, and SHALL report the count of estimated costs per variant; before `RULES.md` is committed, that estimator SHALL reproduce `total_cost_usd` within 0.1% on every one of the 24 pilot trials.
+- **R25** — IF a kept trial has no reported cost, THEN owl SHALL compute its cost from its session transcripts (main and subagent files), taking the usage of the last record of each `message.id` at the round's fixed prices, SHALL mark it as estimated, SHALL NOT use Harbor's estimate for Claude Code trials, and SHALL report the count of estimated costs per variant; before `RULES.md` is committed, that estimator SHALL reproduce `total_cost_usd` within 0.1% on every one of the 24 trials of the pilot of `specs/r1-refresco/` (its R6 and R7), at the round model's official prices.
 
 ### Análisis
 - **R26** — For each variant against `vanilla-default` over the dev tasks, the system SHALL compute the per-task paired log ratio of mean cost and the per-task difference in behavior-violation rate, each with its exact sign-flip permutation p-value and a seeded task-level bootstrap 95% interval, and SHALL report the cost as a percent change; WHEN every per-task value of an endpoint is identical, the system SHALL print the per-arm counts x/n instead of an interval.
@@ -79,3 +87,6 @@ explícita. La numeración de R no cambió respecto de la revisión 2.
 ### Pre-condiciones de F2 y cierre
 - **R38** — Before `RULES.md` is committed, the instrument adjustments of `specs/f2-suite-v1/pilot.md` ("Ajustes a aplicar") SHALL be applied without changing any task's reward, and every task they change SHALL pass `owl validate`.
 - **R39** — The round SHALL close only when `rounds/r1/report.md` is committed and `rounds/r1/failures.md` classifies one reviewed failing transcript per cell listed by R34 plus every limit-hit and tampered trial.
+
+### Revisión 4: pins al corte
+- **R40** — Before `RULES.md` is committed, every pin of `round.yaml` SHALL equal the latest stable release published on or before the round's `cutoff_date`, and the smoke and `owl validate --suite --holdout` SHALL pass on those pins; a pin kept older SHALL be justified in `RULES.md`.

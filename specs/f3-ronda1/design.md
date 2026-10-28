@@ -1,5 +1,13 @@
 # F3 — Ronda 1 — Design
 
+> **Revisión 4 (2026-10-28).** Decisión del usuario: refrescar la ronda a las versiones vigentes en una
+> fecha de corte antes del pre-registro y pasar el modelo a Haiku 5.5. Cambian D1, D3 (nota de v4), D21
+> y el ejemplo de `round.yaml` en Contracts; entra D22 (pins al corte). El refresco y el piloto
+> con Haiku 5.5 están en `specs/r1-refresco/`. Lo implementado en las revisiones 1–3 (lotes 0–6, RH1, RH3, extras del reporte) no
+> cambia. El corte, los pins y el registro de holdout quemado los hace cumplir
+> `specs/round-protocol/`. Donde este documento cita Harbor 0.23.0 o gentle-ai v3.7.0, rige hasta que
+> `specs/r1-refresco/` lo reemplace.
+
 > Diseño del architect, revisión 3 (2026-09-29): la revisión 2 (challenge
 > `.claude/progress/challenge_f3.md`: 3 BLOCKER, 8 CONCERN, 5 NOTE) más su "Re-check (revision 2)"
 > (4 CONCERN, 4 NOTE) y las decisiones nuevas del usuario. Pendiente del veredicto del orchestrator. Razonamiento, opciones descartadas, respuesta
@@ -97,9 +105,17 @@ por sus eventos vecinos; allowlist de red; redacción del holdout en `owl gate`.
 
 ## Decisions
 
-### D1 — Modelo: Haiku 4.5, fijo por ronda (R1)
-- Es el `DEFAULT_MODELS["claude-code"]` de `owl/cli.py:30-33`, el modelo del piloto y el que fija el
-  usuario. VISION D4 se corrige a "fijo por ronda; ronda 1: Haiku 4.5".
+### D1 — Modelo: Haiku 5.5, fijo por ronda (R1; revisión 4)
+- **Revisión 4:** `anthropic/claude-haiku-5-5`. Claude Code 2.1.293 lo agregó como Haiku por defecto
+  de la API (1M de contexto, $0.10/$0.50 por MTok de entrada/salida; $0.50/$2.50 sobre 100K). La
+  página de deprecaciones de Anthropic da a `claude-haiku-4-5-20251001` un retiro "not sooner than
+  October 15, 2026", fecha ya vencida: correr r1 con 4.5 arriesga un retiro a mitad de ronda y mide un
+  modelo que ya no es el por defecto. Los precios de cache salen de la tabla oficial y se
+  validan con el piloto de `specs/r1-refresco/` (R25), que también cambia el modelo por defecto de `owl/cli.py`.
+- **Qué cambia respecto del piloto de F2:** sus tasas de éxito y su costo (Haiku 4.5) ya no sirven
+  para la sensibilidad esperada ni para validar el estimador; los reemplaza el piloto de `specs/r1-refresco/`.
+- Revisión 3 (histórico): era el modelo por defecto de `owl/cli.py`, el del piloto y el que fijó el
+  usuario. VISION D4 se corrige a "fijo por ronda; ronda 1: Haiku 5.5".
 - **Qué se pierde:** los resultados no se extienden a Sonnet u Opus; un harness pensado para modelos
   grandes puede rendir peor con Haiku. El reporte lo declara.
 
@@ -115,6 +131,12 @@ por sus eventos vecinos; allowlist de red; redacción del holdout en `owl gate`.
   registrada.
 
 ### D3 — gentle-ai (R6, R9)
+**Revisión 4.** gentle-ai v4.0.0 retira SDD y OpenSpec: ODD queda como único flujo de desarrollo, la
+revisión nativa (RDD) y test-first siguen disponibles, y el módulo pasa a `/v4`. Lo que sigue en esta
+sección y `spike-gentle-ai.md` describen v3.7.0. `specs/r1-refresco/` repite el spike sobre v4.3.1 (flags de `install`,
+qué escribe fuera de `/app`, telemetría, hooks y engram esperado), reescribe el manifiesto y repite la
+auditoría de prefijos (T14) antes del pre-registro.
+
 **Binario.** Release fijado `v3.7.0`; publica `gentle-ai_3.7.0_linux_{amd64,arm64}.tar.gz`,
 `checksums.txt`, `checksums.txt.minisig` (challenge C1, `gh release view`). Receta idéntica a la de
 engram en `variants/navori.yaml:108-126`: `curl`, `sha256sum -c`, extracción a `$HOME/.local/bin`. La
@@ -724,16 +746,23 @@ piloto y se congela antes del primer trial de F3; no lee ningún job de F3.
 - **Multi-sesión con memoria:** fuera de r1 (memoria reseteada por trial, VISION §7.8).
 - **`max_turns` y presupuesto:** D7. **0/5 y 5/5:** D11. **Ruta de navori:** D17. **Red:** D16.
 
-### D21 — Secuencia de implementación
-Dependencias completas en `tasks.md` §"Orden y paralelismo".
-1. **Arranque en paralelo:** lote 0 (ajustes del piloto e indicadores), lote 1 (ronda, esquema,
-   `install()`, `changes.tsv`) y T18 (funciones de análisis, puras).
-2. **Tras el lote 1, en paralelo:** lote 2 (condiciones, gate, costo y su validación) y lote 3 (gentle-ai,
-   placebo, auditoría de artefactos).
-3. **Tras el lote 2, en paralelo:** lote 4 (planificador) y T19–T20 (reporte; también piden T2 y T6).
-4. Smoke (lote 6), con los lotes 1–4 cerrados. 5. Pre-registro (lote 7): T22 sincroniza el holdout y
-   valida la suite con los prefijos finales, después T23 escribe `RULES.md`. 6. Ronda (lote 8).
-7. Reporte congelado, revelación con OK del usuario y revisión de fallas (lote 9).
+### D21 — Secuencia de implementación (revisión 4)
+Lotes 0–6 cerrados (entrega E1 de `tasks.md`, historial). Antes de lo que falta van dos specs:
+`specs/round-protocol/` (pins, corte, holdout quemado y procedimiento) y `specs/r1-refresco/` (Harbor,
+Claude Code y variantes al corte, gentle-ai v4, Haiku 5.5 y su piloto). Después, en `tasks.md`:
+1. **E2 — Conformidad y pre-registro:** workplan `f3-conformity` (H1 `HARBOR_TELEMETRY=0`; H2 versión,
+   `exception_type` y `lock.json`, con `exception_type` y la comparación de `version` ya presentes en
+   `owl/gate.py`; A cpus y memoria; D esfuerzo, permisos y herramientas; G `net_pinning`), smoke con
+   los pins finales, sincronización del holdout (T22) y `RULES.md` (T23) con las declaraciones de
+   riesgo residual RH5 (`docs/research/08`) y de RH1 (`.claude/progress/solution_rh1.md`). Requiere
+   `specs/round-protocol/` y `specs/r1-refresco/` mergeados.
+2. **E3 — Ronda y cierre:** T24, T25 y T26.
+
+### D22 — Pins al corte (R1, R40; revisión 4)
+El refresco, su tabla de versiones y el piloto con Haiku 5.5 están en `specs/r1-refresco/design.md`
+(D1–D4). Para este spec queda una regla: `RULES.md` (T23) registra el corte y los pins, y justifica todo
+pin que quede anterior a la versión vigente en el corte (R40).
+
 
 ### Trazabilidad R → decisión
 
@@ -752,15 +781,24 @@ Dependencias completas en `tasks.md` §"Orden y paralelismo".
 | R11 | D7 | R24 | D11 | R37 | D15 |
 | R12 | D6 | R25 | D10 | R38 | D18 |
 | R13 | D5, D10 | R26 | D12 | R39 | D19 |
+| R40 | D22 | | | | |
 
 ## Contracts
 
 **`rounds/r1/round.yaml`** (valores propuestos; `RULES.md` los congela):
 ```yaml
 id: r1
-model: anthropic/claude-haiku-4-5-20251001
+model: anthropic/claude-haiku-5-5
 auth: oauth
-agent_version: "2.1.281"
+agent_version: "2.1.312"
+cutoff_date: 2026-10-28    # D22; lo fija specs/r1-refresco/
+pins:                      # specs/round-protocol/ R1
+  harbor: "0.25.0"
+  variants:
+    navori: "0.12.3"
+    superpowers: "v7.0.1@2ce8aa15"
+    ponytail: "main@09c434ab"
+    gentle-ai: "v4.3.1"
 variants: [vanilla-default, navori, gentle-ai, superpowers, ponytail, placebo]
 baseline: vanilla-default
 placebo: placebo
@@ -793,12 +831,12 @@ limits:
   max_budget_usd: "5.00"
 network: public            # declarada; sin allowlist en r1
 preamble: preamble.md
-prices_usd_per_mtok:       # R25; Haiku 4.5; reproducen total_cost_usd de los 24 trials del piloto (D10, T10)
-  input: 1.00
-  output: 5.00
-  cache_read: 0.10
-  cache_write_5m: 1.25
-  cache_write_1h: 2.00
+prices_usd_per_mtok:       # R25; Haiku 5.5; tabla oficial y piloto de specs/r1-refresco/
+  input: 0.10
+  output: 0.50
+  cache_read: 0.01         # a confirmar en specs/r1-refresco/
+  cache_write_5m: 0.125    # a confirmar en specs/r1-refresco/
+  cache_write_1h: 0.20     # a confirmar en specs/r1-refresco/
 scope:
   always_allowed: [CHANGELOG.md]
   test_paths: ["packages/*/test/"]
