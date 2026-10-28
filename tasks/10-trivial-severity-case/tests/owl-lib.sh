@@ -658,9 +658,23 @@ owl_f2p() {
   rel_files=$(cd "$f2p_dir" && find . -type f | sed 's|^\./||')
   [ -n "$rel_files" ] || return 0
 
-  cp -r "$f2p_dir/." /app/
+  # Root writes these files: an agent-planted symlink at a destination or in its parent path must
+  # not redirect the write outside /app (RH3), so such a trial is invalid, never scored.
+  local args=() f dest
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    dest="/app/$f"
+    if [ -L "$dest" ] || [ "$(realpath -m "$(dirname "$dest")")" != "$(dirname "$dest")" ]; then
+      OWL_BASELINE_VALID=0
+      return 0
+    fi
+  done <<EOF
+$rel_files
+EOF
+  # owl_begin made /tests owner-only (go-rwx); the copies must stay readable by the node user that
+  # runs them, so they take default modes instead of the mount's.
+  cp -r --no-preserve=mode "$f2p_dir/." /app/
 
-  local args=() f
   while IFS= read -r f; do
     [ -n "$f" ] && args+=("/app/$f")
   done <<EOF
