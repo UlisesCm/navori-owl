@@ -39,7 +39,8 @@
 # delegate to navori's script anyway: (2) it pins `v2.1.0` instead of
 # `releases/latest`, for reproducibility — a trial's harness shouldn't silently
 # change because upstream cut a new release mid-run. ENGRAM_VERSION is the single
-# place to bump it. Upstream follow-up so `init` installs always-on externalTools
+# place to bump it. r1 cutoff (2026-10-28): navori@0.12.3's engram plugin.json still
+# installs `releases/latest`, which resolves to v3.6.0 (2026-10-24), so that is the pin. Upstream follow-up so `init` installs always-on externalTools
 # itself: https://github.com/UlisesCm/navori-harness/issues/1023. Verified end-to-end for free
 # in a node:22-bookworm-slim container (git/ca-certificates/curl/procps, matching
 # tasks/00-smoke/environment/Dockerfile, root user matching the image's lack of a
@@ -102,15 +103,15 @@
 # scope/reward, but declared as agent output rather than harness-written state). `.codex/progress/` is omitted regardless: this
 # variant never renders the Codex engine.
 id: navori
-description: navori-harness instalado por su propio installer (npx), pineado a 0.10.0, con engram instalado desde su release pineado.
+description: navori-harness instalado por su propio installer (npx), pineado a 0.12.3, con engram instalado desde su release pineado.
 agent: claude-code
-agent_version: "2.1.281"
+agent_version: "2.1.312"
 harness:
-  version: "0.10.0"   # round-protocol R2
+  version: "0.12.3"   # round-protocol R2
   upstream: npm:navori
   init: |
     set -eu
-    ENGRAM_VERSION="2.1.0"
+    ENGRAM_VERSION="3.6.0"
     case "$(uname -m)" in
       x86_64) ENGRAM_ARCH=amd64 ;;
       aarch64|arm64) ENGRAM_ARCH=arm64 ;;
@@ -127,8 +128,8 @@ harness:
     chmod +x "$HOME/.local/bin/engram"
     rm -rf -- "$ENGRAM_TMP"
     export PATH="$HOME/.local/bin:$PATH"
-    npx --yes navori@0.10.0 init --yes --cwd /app
-    npx --yes navori@0.10.0 render --apply --cwd /app
+    npx --yes navori@0.12.3 init --yes --cwd /app
+    npx --yes navori@0.12.3 render --apply --cwd /app
     # Spike T0 (D13): sentinel check, verified free in a node:22-bookworm-slim
     # container against a fixture CLAUDE.md (specs/f2-suite-v1/spike.md, check 3)
     # — coexist init + render --apply generates .claude/ and registers engram in

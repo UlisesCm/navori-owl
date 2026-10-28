@@ -1,14 +1,14 @@
 id: ponytail
 description: DietrichGebert/ponytail cargado como plugin de sesión (--plugin-dir).
 agent: claude-code
-agent_version: "2.1.281"
+agent_version: "2.1.312"
 harness:
-  version: "main@e3ba2aa6"   # round-protocol R2
+  version: "main@09c434ab"   # round-protocol R2
   upstream: github-commit:DietrichGebert/ponytail
   plugins:
     - name: ponytail
       git: https://github.com/DietrichGebert/ponytail
-      ref: e3ba2aa6f1e6f0bc4d69eb09c9f0d0a93af56156   # 2026-09-14
+      ref: 09c434ab73ca43761c5d8b0c5d341926c2fba710   # 2026-10-18
 expect:
   plugins: [ponytail]
-  mcp_servers: []   # confirmed 2026-09-24 (CLI 2.1.281): plugins=['ponytail'], mcp_servers=[]
+  mcp_servers: []   # confirmed 2026-09-24 (CLI 2.1.281); 09c434ab's plugin.json declares no MCP server

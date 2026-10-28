@@ -165,3 +165,12 @@ def test_harness_version_required_with_plugins_or_init(fake_repo: Path) -> None:
 def test_harness_variants_declare_release(vid: str) -> None:
     v = Variant.load(vid)
     assert v.version and v.upstream
+
+
+R1_VARIANTS = ["vanilla-default", "navori", "gentle-ai", "superpowers", "ponytail", "placebo"]
+
+
+# Covers: R1 (r1-refresco)
+def test_round_variants_share_agent_version() -> None:
+    """Every round-1 variant runs the same Claude Code release, pinned at the cutoff."""
+    assert {Variant.load(vid).agent_version for vid in R1_VARIANTS} == {"2.1.312"}

@@ -37,7 +37,7 @@
 id: gentle-ai
 description: gentle-ai v3.7.0 instalado desde su release pineado (claude-code, preset full-gentleman, scope workspace) con telemetría apagada.
 agent: claude-code
-agent_version: "2.1.281"
+agent_version: "2.1.312"
 harness:
   version: "v3.7.0"   # round-protocol R2
   upstream: github-release:Gentleman-Programming/gentle-ai
