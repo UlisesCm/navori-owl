@@ -143,3 +143,25 @@ def test_artifacts_audit_has_one_row_per_declared_prefix() -> None:
         if len(hits) != 1:
             missing.append((vid, prefix, len(hits)))
     assert not missing, f"artifacts-audit.md needs exactly one row per (variant, prefix): {missing}"
+
+
+# Covers: R2 (round-protocol)
+def test_harness_version_required_with_plugins_or_init(fake_repo: Path) -> None:
+    _write(fake_repo, "  init: echo hi\n")
+    with pytest.raises(SystemExit, match="harness.version"):
+        Variant.load("v")
+    _write(fake_repo, "  init: echo hi\n  version: '1.0'\n  upstream: ftp:thing\n")
+    with pytest.raises(SystemExit, match="harness.upstream"):
+        Variant.load("v")
+    _write(fake_repo, "  init: echo hi\n  version: '1.0'\n  upstream: github-release:o/r\n")
+    v = Variant.load("v")
+    assert (v.version, v.upstream) == ("1.0", "github-release:o/r")
+    _write(fake_repo, "  bare: true\n")
+    assert Variant.load("v").version is None
+
+
+# Covers: R2 (round-protocol)
+@pytest.mark.parametrize("vid", ["navori", "gentle-ai", "superpowers", "ponytail"])
+def test_harness_variants_declare_release(vid: str) -> None:
+    v = Variant.load(vid)
+    assert v.version and v.upstream

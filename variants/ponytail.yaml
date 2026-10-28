@@ -3,6 +3,8 @@ description: DietrichGebert/ponytail cargado como plugin de sesión (--plugin-di
 agent: claude-code
 agent_version: "2.1.281"
 harness:
+  version: "main@e3ba2aa6"   # round-protocol R2
+  upstream: github-commit:DietrichGebert/ponytail
   plugins:
     - name: ponytail
       git: https://github.com/DietrichGebert/ponytail

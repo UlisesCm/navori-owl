@@ -35,7 +35,7 @@ from owl.summary import (
 from owl.tasks import TaskInfo, exit_refused
 from owl.variants import ROOT
 
-PHRASE = "r1 es una ronda de costo y comportamiento; el éxito es descriptivo"
+PHRASE = "{round_id} es una ronda de costo y comportamiento; el éxito es descriptivo"
 _LIMIT_KEYS = ("agent_timeout_multiplier", "agent_setup_timeout_multiplier", "max_turns", "max_budget_usd")
 _TOKEN_KEYS = ("input", "output", "cache_read", "cache_write")
 _FAILURE_MODES = ("agent", "insufficient instruction", "narrow verifier", "broad verifier",
@@ -460,7 +460,8 @@ def _header(round_def: Round, trials: list[Trial], metas: list[dict]) -> dict:
         "agent_versions": {m["id"]: m.get("agent_version") for m in metas},
         "started_at": min(starts, default=None), "finished_at": max(ends, default=None),
         "trials": len(trials), "cost_usd": sum(t.gate.cost_usd or 0.0 for t in trials),
-        "statement": PHRASE,
+        "statement": PHRASE.format(round_id=round_def.id),
+        "cutoff_date": round_def.cutoff_date or None, "pins": round_def.pins,
     }
 
 
@@ -693,9 +694,15 @@ def _fmt(line: dict) -> str:
 def _md_header(r: dict) -> str:
     h = r["round"]
     versions = ", ".join(f"{v} {ver}" for v, ver in h["agent_versions"].items())
+    pins = h.get("pins") or {}
+    pinned = ", ".join(
+        [f"harbor {pins['harbor']}"] * bool(pins.get("harbor"))
+        + [f"{v} {ver}" for v, ver in (pins.get("variants") or {}).items()]
+    )
     return (
         f"# Reporte de la ronda {h['id']}\n\n## 1. Encabezado\n\n> {h['statement']}\n\n"
         f"- Commit: {h['commit'] or 'n/d'}\n- Hashes: {h['sha256'] or 'n/d'}\n- Versiones: {versions}\n"
+        f"- Corte: {h.get('cutoff_date') or 'n/d'}; pins: {pinned or 'n/d'}\n"
         f"- Fechas: {h['started_at'] or 'n/d'} a {h['finished_at'] or 'n/d'}\n"
         f"- Trials: {h['trials']}; costo equivalente API: ${h['cost_usd']:.2f}"
     )

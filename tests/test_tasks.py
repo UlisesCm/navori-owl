@@ -10,6 +10,7 @@ from owl.tasks import (
     NON_SUITE_TYPES,
     SUITE_CATEGORIES,
     TaskInfo,
+    burned_tasks,
     holdout_signals,
     is_holdout,
     refuse_holdout,
@@ -165,3 +166,13 @@ def test_suite_tasks_includes_holdout_only_when_asked(tmp_path: Path, monkeypatc
 
 def test_suite_categories_and_non_suite_types_disjoint() -> None:
     assert SUITE_CATEGORIES.isdisjoint(NON_SUITE_TYPES)
+
+
+# Covers: R7, R8 (round-protocol)
+@pytest.mark.parametrize("content", ["{not: [valid", "- just-a-string\n", "- {task: holdout/x}\n"])
+def test_burned_registry_fails_closed(tmp_path: Path, content: str) -> None:
+    (tmp_path / "burned.yaml").write_text(content)
+    with pytest.raises(SystemExit, match="refusing any holdout plan"):
+        burned_tasks(tmp_path)
+    (tmp_path / "burned.yaml").unlink()
+    assert burned_tasks(tmp_path) == []

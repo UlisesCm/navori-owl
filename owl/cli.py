@@ -217,6 +217,14 @@ def cmd_gate(args: argparse.Namespace) -> int:
     return 0 if all(g.passed for g in gates) else 2
 
 
+def cmd_pins(args: argparse.Namespace) -> int:
+    """round-protocol R5, R6: print the freshness table; always exit 0."""
+    from owl.pins import pin_rows, render
+
+    print(render(pin_rows(args.round)))
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="owl")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -269,6 +277,10 @@ def main() -> None:
         help="Required when the round's jobs hold holdout trials (R36); adds an uncalibrated descriptive section.",
     )
     report.set_defaults(func=cmd_report)
+
+    pins = sub.add_parser("pins", help="Each pin of a round against its latest stable upstream release (informational).")
+    pins.add_argument("--round", required=True, help="Round directory, e.g. rounds/r1.")
+    pins.set_defaults(func=cmd_pins)
 
     validate = sub.add_parser(
         "validate", help="Free checklist (oracle x5, nop, CheatAgent attacks): owl-validate.json, no model calls."

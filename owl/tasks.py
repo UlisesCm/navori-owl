@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NoReturn
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 TASKS_DIR = ROOT / "tasks"
 HOLDOUT_DIR = ROOT / "holdout"
@@ -135,6 +137,25 @@ def resolve_task_args(task: list[str] | None, suite: bool, holdout: bool) -> lis
     if refused:
         exit_refused("run", refused)
     return task_paths
+
+
+def burned_tasks(holdout_dir: Path = HOLDOUT_DIR) -> list[str]:
+    """round-protocol R7, R8: tasks revealed in an earlier round, from ``holdout/burned.yaml``.
+
+    The registry sits at the root of ``holdout/``, outside every task, so reading it touches no holdout
+    content. It fails closed: a malformed registry refuses any plan that includes holdout tasks.
+    """
+    path = holdout_dir / "burned.yaml"
+    if not path.is_file():
+        return []
+    try:
+        entries = yaml.safe_load(path.read_text()) or []
+    except yaml.YAMLError as exc:
+        raise SystemExit(f"{path}: invalid YAML ({exc}); refusing any holdout plan") from None
+    keys = {"task", "round", "revealed"}
+    if not isinstance(entries, list) or not all(isinstance(e, dict) and keys <= set(e) for e in entries):
+        raise SystemExit(f"{path}: expected a list of {{task, round, revealed}} entries; refusing any holdout plan")
+    return [str(e["task"]) for e in entries]
 
 
 def exit_refused(verb: str, refused: list[Path] | list[str]) -> NoReturn:
