@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pytest
 
+from owl.agents.cheat import ATTACKS
+
 ROOT = Path(__file__).resolve().parent.parent
 TASK_DIR = ROOT / "tasks" / "00-smoke"
 IMAGE_TAG = "owl-test-00-smoke:pytest"
@@ -298,6 +300,17 @@ def test_symlinked_pristine_test_fails_closed_without_overwriting_target(contain
         "cd /app && rm test/subtotal.test.js && ln -s /logs/target test/subtotal.test.js",
         user="node",
     )
+    reward = _run_verifier(container)
+    assert reward["reward"] == 0
+    assert reward["baseline_valid"] == 0
+    assert _docker_exec(container, "cat /logs/target") == "KEEP\n"
+
+
+# Covers: R3, R6, R10, R12
+def test_symlinked_f2p_destination_fails_closed_without_overwriting_target(container: str) -> None:
+    """Root's copy of the hidden F2P test must not follow an agent-planted symlink out of /app."""
+    _docker_exec(container, "mkdir -p /logs && printf 'KEEP\n' > /logs/target && chown node:node /logs/target")
+    _docker_exec(container, "cd /app && ln -s /logs/target test/discount.test.js", user="node")
     reward = _run_verifier(container)
     assert reward["reward"] == 0
     assert reward["baseline_valid"] == 0
@@ -813,10 +826,7 @@ def test_owl_validate_smoke_end_to_end(tmp_path: Path) -> None:
     assert entry["nop"]["ok"] is True, entry["nop"]
     assert entry["nop"]["reward"].get("reward") == 0
 
-    assert set(entry["cheat"].keys()) == {
-        "read-hidden", "tamper-fail", "tamper-pass", "hardcode", "move-baseline", "plant-reward",
-        "import-payload", "assert-patch", "forged-frame",
-    }
+    assert set(entry["cheat"].keys()) == set(ATTACKS)
     for attack, cheat_result in entry["cheat"].items():
         assert cheat_result["ok"] is True, (attack, cheat_result["reasons"])
 

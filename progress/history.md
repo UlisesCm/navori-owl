@@ -1,3 +1,19 @@
+## 2026-10-28 15:10 Pi — Fix de permisos de los tests F2P del verifier
+
+## Goal
+Que owl_f2p corra los tests F2P ocultos legibles para node pese al go-rwx de RH3 sobre /tests.
+## Discoveries
+- Tras RH3, `cp -r` desde /tests dejaba las copias F2P solo para root: una solución honesta daba f2p=0. Reproducido quitando `--no-preserve=mode` (falla test_guard_honest_f2p_still_passes_with_no_payload).
+- PR #31 (specs rev4) se mergeó sobre chore/harness-navori-0.12.3 ya mergeada; su contenido no está en main. #32 se reapunta a main y lo arrastra.
+- En Pi los subagentes navori terminan sin salida; ciclo hecho inline.
+## Accomplished
+- owl_f2p: guarda de symlink en destino y padre (baseline_valid=0, sin copiar) y `cp -r --no-preserve=mode`; copias idénticas en tasks/*/tests/owl-lib.sh; test docker del symlink F2P; end-to-end usa set(ATTACKS).
+- Gate: ruff check . && uv run pytest -m 'not docker' → 293 passed; docker -k 'f2p or symlink' 5 passed; owl_validate_smoke_end_to_end 1 passed.
+## Next Steps
+- Mergear fix y #32; r1-refresco E1 (Harbor 0.25.0); T29 → T22 → T23.
+## Relevant Files
+- owl/verifier/lib.sh, tasks/*/tests/owl-lib.sh, tests/test_validate_docker.py.
+
 ## 2026-10-01 20:50 Codex — RH3 y prefijos finales del harness
 
 ## Goal

@@ -1,9 +1,9 @@
 # Sesión actual
 
-**Estado:** F3 en curso. RH1 y harness Codex/Pi mergeados; report extras B/C/E/F mergeados en PR #27 (73535f9). RH3/prefijos APPROVED en feat/f3-rh3-prefixes, gate 292 passed y Docker enfocado 5 passed; publicación pendiente.
+**Estado:** F3 en curso. Fix de permisos F2P (`fix/verifier-f2p-perms`, workplan f3-f2p-perms A1–A4 cumplidos) publicado en PR a main. PR #32 (round-protocol E1) reapuntado a main: arrastra también el contenido de #31 (specs rev4), que se mergeó sobre `chore/harness-navori-0.12.3` y nunca llegó a main.
 
-**Siguiente:** workplan f3-conformity; después repetir T22 con lib.sh y prefijos finales. T23 exige aprobación de RULES.md antes del commit.
+**Siguiente:** mergear el fix F2P y #32; seguir con `r1-refresco` E1 (Harbor 0.25.0); después T29 conformidad → T22 (copiar lib.sh a holdout/ solo con cp, sin leer contenido) → T23 (requiere aprobación de RULES.md).
 
-**Decisiones:** peek-tests documentado; read-hidden/peek-tests requieren reward=0, f2p=0 y ausencia de filtración, sin exigir p2p=0. RH4/I/RH2 después de r1.
+**Decisiones:** todos los PRs van a main. read-hidden/peek-tests exigen reward=0, f2p=0 y sin filtración (no p2p=0). RH4/I/RH2 después de r1.
 
-**Checkout principal:** feat/f3-t22-holdout-sync conserva tres holdout/*/tests/owl-lib.sh sin commit. No cambiar branch ni leer contenido holdout.
+**Bloqueo de entorno:** en Pi los subagentes navori terminan sin salida; los ciclos se corren inline y se declara en el cierre. Docker es OrbStack: si no responde, `orb start`.
