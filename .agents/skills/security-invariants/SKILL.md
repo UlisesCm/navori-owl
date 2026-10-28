@@ -1,15 +1,15 @@
 ---
 name: security-invariants
-description: Use when running /security-review or auditing security. Documents the BUSINESS security invariants that the static scanner (semgrep) and the built-in review can't infer from code alone — server-side authorization, object access (IDOR), secrets and env exposed to the client, trust boundaries, PII in logs. The skeleton is universal; your stack's rules go in the user-section.
+description: Use when running /security-review or auditing security. Documents the BUSINESS security invariants that the static scanner (if the repo runs one) and the built-in review can't infer from code alone — server-side authorization, object access (IDOR), secrets and env exposed to the client, trust boundaries, PII in logs. The skeleton is universal; your stack's rules go in the user-section.
 metadata:
   type: reference
   maxWords: 1200
 ---
 
-<!-- navori:managed id="security-invariants-base" hash="8a08c119" version="0.11.1" source="@navori/core" fmkeys="name,description,metadata" -->
+<!-- navori:managed id="security-invariants-base" hash="4b081684" version="0.12.3" source="@navori/core" fmkeys="name,description,metadata" -->
 # Security invariants — the business security layer
 
-Feeds the `/security-review` flow and is the single owner of the security checklist for `reviewer` and `auditor`. `semgrep` is an OPT-IN plugin, not a given, so the business invariants below (authorization, IDOR, trust) sit next to a compact fallback list (§7) for the generic patterns a scanner would otherwise catch.
+Feeds the `/security-review` flow and is the single owner of the security checklist for `reviewer` and `auditor`. A static scanner is not a given (Navori ships none), so the business invariants below (authorization, IDOR, trust) sit next to a compact fallback list (§7) for the generic patterns a scanner would otherwise catch.
 
 Report with severity `[CRITICAL]`/`[HIGH]`/`[MEDIUM]` and `file:line`, as in `review-diff`. An authorization bypass or an exposed secret is CRITICAL.
 
@@ -50,7 +50,7 @@ Report with severity `[CRITICAL]`/`[HIGH]`/`[MEDIUM]` and `file:line`, as in `re
 
 ## 7. If no scanner is installed
 
-When the repo has no static analyzer (e.g. `semgrep`) wired in, additionally scan the diff by hand for the patterns a scanner would otherwise catch:
+When the repo has no static analyzer wired in, additionally scan the diff by hand for the patterns a scanner would otherwise catch:
 
 1. Hardcoded credentials / API keys / tokens in source.
 2. SQL injection — string-concatenated queries with unsanitized input.

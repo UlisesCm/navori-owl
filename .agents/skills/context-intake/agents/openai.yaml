@@ -1,0 +1,4 @@
+# navori:managed start id="context-intake-openai-policy" hash="04841ff2" version="0.12.3" source="@navori/core"
+policy:
+  allow_implicit_invocation: false
+# navori:managed end id="context-intake-openai-policy"

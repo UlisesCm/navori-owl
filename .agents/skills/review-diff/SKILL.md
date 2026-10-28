@@ -4,13 +4,13 @@ description: Use when reviewing a diff (staged, branch or PR). A code-review che
 metadata:
   type: behavior
   maxWords: 1200
-  # Compuesto (#683): 1200 del núcleo + 200 de `jscpd-review` = 1400, más 50 de
+  # Compuesto (#683): 1200 del núcleo + 200 de extensiones de plugin = 1400, más 50 de
   # margen para los `project.criticalAreas` que el render interpola DENTRO del
   # bloque managed — de ahí salía el exceso sin que ningún plugin participara.
   maxWordsComposed: 1450
 ---
 
-<!-- navori:managed id="review-diff-base" hash="284bc2ec" version="0.11.1" source="@navori/core" fmkeys="name,description,metadata" -->
+<!-- navori:managed id="review-diff-base" hash="284bc2ec" version="0.12.3" source="@navori/core" fmkeys="name,description,metadata" -->
 # Code review — checklist for a diff
 
 Apply this checklist to a diff (staged, branch vs `main`, or a PR). The skeleton is stack-agnostic; repo-specific rules live in the user-section below.

@@ -1,11 +1,11 @@
-<!-- navori:managed id="cierre-sesion" hash="1249ad8f" version="0.11.1" source="@navori/core" -->
+<!-- navori:managed id="cierre-sesion" hash="5dcd51fc" version="0.12.3" source="@navori/core" -->
 ## Session closeout
 
 Before closing the session:
 
 1. **Quality gate**: run `navori receipt check --feature <feature> --include-consumed --json`. `"status":"ok"` and `"fresh":true` → cite the receipt as evidence, no re-run needed. Any other result → run ruff check . && uv run pytest -m 'not docker' again (or document debt in `progress/current.md`).
 2. **History**: add an entry in `progress/history.md` with `## YYYY-MM-DD HH:MM <agent> — <summary>` + changes + gate status. **One redaction, every destination**: write that summary once and reuse the same text wherever else this closeout persists it (a memory store, for instance) — never write the same session up twice. If the session turned up a durable fact that outlives this repo (a data model, a business rule, a cross-service contract, a shared gotcha), promote it with the `dominio` skill instead of leaving it only in session memory.
-3. **Clear current**: leave `progress/current.md` at `idle` or with the explicit next step.
+3. **Clear current**: leave `progress/current.md` at `idle` or with the explicit next step. It holds only current state and next step (≤ ~4000 bytes); checkpoints and narrative go to `progress/history.md` (step 2). Agent commits growing it past ~8000 bytes are blocked.
 4. **No temporaries**: delete scratch files; don't leave `console.log`, `debugger`, or commented-out code.
 5. **Commit**: atomic, in the configured style (`conventional-es`), landing inside the work PR before it opens — never a `progress/`-only PR; `history.md` can't cite it. No work PR → commit `progress/` alone.
 6. **Park on base**: once the cycle's work is committed and its branch pushed (PR opened when the flow calls for one), leave the repo standing on the base branch, synced: `git switch main` then `git pull --ff-only`. The point is where the NEXT session starts from — a repo parked on last week's feature branch breeds branches cut from stale bases. Rules that make it safe:

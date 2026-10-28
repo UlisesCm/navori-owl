@@ -13,16 +13,21 @@ metadata:
   # goes up explicitly rather than shrinking unrelated prose to make space —
   # the override is loud, not silent (skill-meta.ts). 720 leaves a real
   # margin (697/720) instead of reproducing the same 3-word squeeze.
-  maxWords: 720
+  # Spec 0044 T10 (R10): E/M/A/T grammar added (delivery/milestone/acceptance/task
+  # structure), +~150 words measured; 1050 = 981 actual + 7% margin.
+  # #1273: re-measured at 823 after the Covers convention moved in; ceil(823 × 1.10)
+  # = 906 (the 1050 above had drifted slack).
+  maxWords: 906
   # Spec 0026 T16 (R35): the critical-areas challenge interpolates
   # auth, permissions, payments, data integrity INSIDE the managed zone, same defect as
   # review-diff (#683) — a verbose repo config pushes the composed file past
   # the asset's own cap with no plugin involved. Margin measured against the
-  # skill-caps-composed.test.ts fixture.
-  maxWordsComposed: 750
+  # skill-caps-composed.test.ts fixture. Spec 0044: +100 words margin
+  # for composition with project config.
+  maxWordsComposed: 1006
 ---
 
-<!-- navori:managed id="spec-bootstrap" hash="e49f6162" version="0.11.1" source="@navori/core" fmkeys="name,description,metadata" -->
+<!-- navori:managed id="spec-bootstrap" hash="1479f683" version="0.12.3" source="@navori/core" fmkeys="name,description,metadata" -->
 # spec-bootstrap — kickoff of an SDD spec
 
 ## Before scaffolding — blocking precondition
@@ -31,9 +36,9 @@ Do not write anything under `specs` unless the user has explicitly accepted star
 
 ## When to use this skill
 
-When SDD-scope work has been agreed with the user. The threshold and its opt-in gate live in ONE place — the **Spec Driven Development** block in `AGENTS.md`; don't re-decide them here, and don't scaffold a spec nobody accepted.
+When SDD work meets its threshold; **the threshold and its opt-in gate live in ONE place**: the **Spec Driven Development** block in `AGENTS.md`. Before asking acceptance, give the compact `resumen de decisión` in chat per `formato-respuesta.md`; a proposal or summary is not authorization to scaffold.
 
-Produces `specs/<feature>/{requirements.md, design.md, tasks.md}` ready to implement. Scaffolding is done by `orchestrator`, not a nested subagent.
+Produces `specs/<feature>/{requirements.md, design.md, tasks.md}`. `orchestrator` scaffolds, not a nested subagent.
 
 **Challenge on critical areas.** WHEN the spec touches `auth, permissions, payments, data integrity`, a fresh-context `auditor` challenges it with `solution-design`'s falsification brief before handoff. One round, no verdict — `orchestrator` decides.
 
@@ -41,7 +46,7 @@ Produces `specs/<feature>/{requirements.md, design.md, tasks.md}` ready to imple
 
 1. **requirements.md first.** No clear requirements, no design. Derive from the ticket/request; each requirement is EARS with id `R<n>`.
 2. **design.md** — how to meet those `R<n>`: affected components, contracts, decisions and trade-offs. Reference the `R<n>` each decision satisfies. Design BEFORE decomposing: an architecture decision (e.g. a contract or a migration path) moves task boundaries, so tasks written first get rewritten. The `architect` writes `design.md`, applying `solution-design`.
-3. **tasks.md** — batches of 1-3 tasks; each task lists the `R<n>` it covers and its test(s).
+3. **tasks.md** — structured by deliveries `E<n>` (one PR each), milestones `M<n>` (one verification/commit each), acceptance criteria `A<n>` per milestone, and tasks `T<n>` that declare the `R<n>` they cover; see the grammar below. A spec without deliveries opens with `workplan: <feature>`; a delivery's workplan is level 3 (`"level": 3`), one per delivery `<spec>-e<n>` with phases = milestones, and its encargo is `spec: <spec> E<n> M<n>`.
 4. **`evals.md` — optional, rare.** Only when the feature ships a new **always-on layer** (context every session pays for), where prose can't prove behavior moved: `specs/<feature>/evals.md` tabulates RED (without the layer) / GREEN (with it) over ONE isolated variable — same ticket, same repo, same model — with named scenarios, each failure against its evidence, and inverted results kept exactly as they came out. The raw transcript dies with the session; the distilled table survives in git.
 
 The reasoning that fills `design.md` is the `solution-design` skill — also the lighter home for an R2-architectural change that skips a full spec.
@@ -82,19 +87,28 @@ raises them (an empty section is noise, not rigor):
 ## NOT in scope         ← deferred work + why, so nobody "improves things along the way"
 ```
 
-`tasks.md`:
+`tasks.md` — E/M/A/T grammar (`navori spec check` parses this):
 ```md
 # <Feature> — Tasks
 
-- [ ] **T1** (R1, R2) — <what gets implemented> · test: <file>::<case> with `// Covers: R1, R2`
-- [ ] **T2** (R3) — <what gets implemented> · test: <file>::<case> with `// Covers: R3`
+## E1 — <title> (optional ' (foundation)')
+Estimated LOC: <n>
+
+### M1 — <title>
+- **A1** [observable] — <desc> · `<command>` → <expected>
+- [ ] **T1** (R<a>, R<b>) — <what> · effect: behavior|docs|tests|schema · test: <file>::<case>
+
+### M2 — <title>
+- **A2** — <desc> · `<command>` → <expected>
+- [ ] **T2** (R<c>) — <what> · effect: behavior · test: <file>::<case>
+- [ ] **T3** (R<d>, R<e>) — <what> · effect: docs · test: <file>::<heading>
 ```
 
 ## Hard rules
 
 - **Zero unresolved placeholders.** Don't leave `<...>`; an unknown value is a question for the user, not a hole. Same rule inside a task: "TBD", "implement later" or "similar to T<n>" describe nothing — name the observable behavior and the evidence expected. That is NOT a licence to dictate the code line by line; the implementer keeps its judgment.
 - **Cite a stable anchor, not a line number:** `file` + symbol name, heading, or managed-block id — never `file:line`. Lines drift before implementation; a stale one skips real sites.
-- **Every `R<n>` ends in ≥1 task and ≥1 test.** A requirement with no task or test isn't traceable → it doesn't enter the spec.
-- **Tracking lives in `tasks.md`, not in `TaskCreate`.** See the SDD block.
+- **Every `R<n>` ends in ≥1 task and ≥1 test**, and each test references its requirements with a `// Covers: R<n>` comment above the case. A requirement with no task or test isn't traceable → it doesn't enter the spec; without full traceability the feature is not done.
+- **Tracking lives in `tasks.md`, not in a parallel task list.** Duplicating it makes the board drift from the spec.
 - **Self-review before closing the scaffolding:** is each `R<n>` a single testable action? does each task point to real `R<n>`? does the design cover all the `R<n>`? If something fails, fix it before handing the spec off.
 <!-- /navori:managed id="spec-bootstrap" -->
