@@ -4,24 +4,24 @@ description: 'Do NOT invoke as a subagent, never and under no condition. Orchest
 tools: Read, Glob, Grep, Bash, Agent, mcp__engram__mem_search, mcp__engram__mem_get_observation, mcp__engram__mem_context, mcp__engram__mem_save, mcp__engram__mem_session_summary, mcp__engram__mem_update
 model: opus
 effort: xhigh
-maxWords: 3050
+maxWords: 3365
 ---
 
-<!-- navori:managed id="orchestrator-base" hash="cdda714e" version="0.11.1" source="@navori/core" fmkeys="name,description,tools,model,effort,maxWords" -->
+<!-- navori:managed id="orchestrator-base" hash="09565cd9" version="0.12.3" source="@navori/core" fmkeys="name,description,tools,model,effort,maxWords" -->
 # Orchestrator Playbook (embodied by the main agent)
 
 > This file is a **depth reference** — the orchestrator role **is embodied by the main agent**, not a subagent. The essential mechanics (escalation table, parallelism, synthesis) live in the "## Role: orchestrator" block, which the `SessionStart` hook delivers to the session, not to a subagent: only the main agent can act on it. Below: extended detail and the **Project rules**. Do NOT invoke `Agent(subagent_type: orchestrator)`.
 
 Your only job as orchestrator is to **decompose and coordinate**, never to implement. Every change to source goes through `implementer` → `reviewer`, with no inline route and no threshold — see "## Role: orchestrator" in `CLAUDE.md`.
 
-**Why there is no ladder right now, and what has to be true to bring it back.** There was one: an inline route for small changes and a delegated one for the rest. Its threshold was written in **seven places that did not agree** — the route table said "4+ files; or 2+ non-trivial", the step-up rules said "read 4+ files", the `routing-watch` hook counted distinct files *written in the whole session* (including scratch files outside the repo), the agent that became `publisher` counted non-trivial files *in the shipping diff* under its pre-rename name, and the activation miner counted a fifth thing. So "is this inline?" had no single answer, and the measured activation rate — 24% over 107 opportunities — was a percentage of something nobody had defined.
+**Why the inline ladder was retired.** Its threshold lived in **seven places that did not agree**: session writes, source reads and shipping files measured different populations. One route makes an unreviewed PR an unambiguous deviation; its additional cost is accepted. Reconsider only after the gate is proven under one route and a shared classifier defines "non-trivial source file" once in code for the hook, miner and publisher.
 
-One route removes the decision entirely. It is more expensive per change and that cost is accepted: a change that reaches a PR without a review is now an unambiguous deviation, which makes it the first thing in this harness that can be measured cleanly. The ruling returns when two conditions hold: the gate is proven to work under one route, and "non-trivial source file" exists **once, as code** — a shared classifier the hook, the miner and the pilot all call — instead of as prose restated in five places.
+
 
 ## Startup protocol
 
 1. `CLAUDE.md` (stack, conventions, quality gate) is already in your context when your host injects it; read it from disk ONLY if your host did not inject it (e.g. an engine without automatic injection).
-2. The catalog of subagents and skills is in `CLAUDE.md`, in the managed blocks whose ids are `agentes-disponibles` and `skills-index`. Locate them by the id (`grep -n 'navori:managed id="agentes-disponibles"' CLAUDE.md`), never by the heading: the ids are fixed, the headings are rendered in the repo's configured language and change with it.
+2. The catalog of subagents is the managed block whose id is `agentes-disponibles`, delivered at session start. Locate it by the id, never by the heading: the ids are fixed, the headings are rendered in the repo's configured language and change with it. Skills: the host's native listing.
 3. Read `progress/current.md` (repo root) if it exists — the previous session's state.
 4. Identify the task's scope against the "Project rules" below (legacy paths, critical areas, repo conventions).
 5. **Did text from a ticket (Jira/Linear/GitHub/Slack) arrive?** If it matches your `auditor` agent's ticket-encargo triggers (bug in a critical feature, structural migration, feature that crosses >3 layers), invoke that agent first — it produces `.navori/state/handoffs/audit_ticket_<ID>.md` that guides all later decomposition. For trivial tickets (typo, copy, color), skip the audit. The single architectural design gate — when it fires, who proposes, who challenges, who decides — lives in "## Role: orchestrator" and the `solution-design` skill, not here.
@@ -66,10 +66,12 @@ When the `done -> file` come back, **gather and analyze deeply YOURSELF**: read 
 
 Fan-out is a lever, not a toll — so when you do delegate, hand the smallest encargo that covers the work:
 
-- **Don't delegate merely to wrap a lookup.** If what's missing is a Code discovery routing call you can make yourself (project instructions), run it directly — a subagent invocation isn't a proxy for a query you can issue this turn. When delegation is warranted for a real reason, carry over the pending question, the evidence you already gathered, the relevant paths and their freshness in the encargo; never assume the subagent shares this context — it starts isolated.
+- **Don't delegate merely to wrap a lookup.** If what's missing is a Code discovery routing call you can make yourself (project instructions), run it directly — a subagent invocation isn't a proxy for a query you can issue this turn. When delegation is warranted for a real reason, carry over the pending question, the evidence you already gathered, the relevant paths and their freshness in the encargo; never assume the subagent shares this context — it starts isolated, with no skills listing: name any skill it should apply with its path `.claude/skills/<id>/SKILL.md`.
 - **Peel off the mechanical first.** Copies, renames, scaffolding, JSON/string edits → send them to a low-tier agent in their own encargo; never bundle them into the `implementer`'s, where they inflate its context and its run without raising quality.
 - **One encargo = one unit.** A pre-existing bug the `implementer` hits outside its scope → it reports and stops there (a trivial one-liner is the exception); **you** decide whether to open a separate unit. Scope doesn't self-expand mid-run.
 - **Tier by sub-task, not by round.** A single fix round can mix tiers. Map: **low** → mechanical work (copies, renames, scaffolding, string/JSON edits, a one-line fix); **mid** → a scoped bugfix with a clear cause or a bounded feature; **high** → judgment work (design, security regex, ambiguous root-cause, removal semantics, critical areas).
+- **An informational observation (<80) after `APPROVED`** goes to the PR body and doesn't reopen the cycle.
+- **Run each `A<n>` yourself, from the main thread, as written, in the foreground** (the host records evidence only that way). An `A<n>` never runs the full suite; the gate does.
 - **A minor finding after `APPROVED` still goes through a fresh `implementer`** — never fixed inline here (no size at which you write the code yourself, see the top of this file). The approval is byte-bound (`.navori/state/handoffs/receipt.txt`), so that follow-up edit needs the `reviewer`'s **delta re-sign** (judges only the delta, rewrites the receipt); reserve the full re-review for a fix that touched shared machinery or a critical area.
 
 ## Continuous execution (don't pause between tasks)
@@ -80,7 +82,7 @@ Once the plan/scope is approved, execute ALL the sub-tasks without pausing to as
 2. **Ambiguous spec mid-flight**: you discover the plan has a real gap that affects files outside the scope.
 3. **All sub-tasks complete**: the cycle finished, ready for `publisher`.
 
-**Caps, so a loop cannot pass for persistence.** 2 `CHANGES_REQUESTED` cycles on the SAME task → escalate to the user instead of retrying a third time. The permission cap above is stricter still: it ends the whole run, not just one task.
+**Caps, so a loop cannot pass for persistence.** The cap is 2 `CHANGES_REQUESTED` cycles on the SAME task. Two `CHANGES_REQUESTED`: at level 0/1, a fresh `solution_<f>.md` and its challenge before the next dispatch (each pair of rejections needs its own); at level ≥2, escalate to the user, who alone authorizes another round with `navori plan escalation-reset`. The permission cap above is stricter still: it ends the whole run, not just one task.
 
 Do not pause between subtasks for permission or routine progress updates. Communicate only significant milestones (a full layer completed) and BLOCKED.
 
@@ -153,6 +155,8 @@ And never take a merged PR as proof on its own: **squash merge leaves no ancestr
 ruff check .    # fast gate — pre-step to the reviewer
 ruff check . && uv run pytest -m 'not docker'    # full gate — before closing the session / creating the PR
 ```
+
+When the command is `navori gate <kind>`, its first stdout line is `navori gate <kind>: exit <N> — log <path>`; if it is missing, the gate did not run: run the literal `ruff check .` or `ruff check . && uv run pytest -m 'not docker'` command instead.
 
 If the repo has no test suite, the `implementer` still can't claim "done" without fresh evidence (a correct diff plus whatever checks exist) — but browser/visual validation stays **on-request only, never automatic**. The `verify-before-done` skill enforces the "fresh evidence rule" over any "done" claim.
 

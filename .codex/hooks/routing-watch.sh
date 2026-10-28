@@ -1,4 +1,4 @@
-# navori:managed start id="routing-watch-base" hash="433be318" version="0.11.1" source="@navori/core"
+# navori:managed start id="routing-watch-base" hash="72016707" version="0.12.3" source="@navori/core"
 #!/usr/bin/env bash
 #
 # PostToolUse routing watcher (spec 0020).
@@ -84,6 +84,8 @@ set -uo pipefail
 # The discard `case` therefore comes BEFORE `session_id`: a tool this hook does
 # not care about must not pay to locate a stamp it will never open. The Bash
 # probe is that same argument one level down — see `navori_has_write_token`.
+nv_payload_fields="agent_id agent_type cwd hook_event_name session_id tool_input.agent_type tool_input.command tool_input.file_path tool_input.notebook_path tool_input.subagent_type tool_name"
+payload_load() { :; }
 # Shared hook boilerplate — inlined into each hook at render time (see the
 # include directive in the source scripts + lib/render/hook-includes.ts). Single source
 # of truth for the sibling gate scripts; DO NOT copy this body back into a hook
@@ -111,6 +113,17 @@ set -uo pipefail
 # clobbering it with "".
 payload=${payload-$(cat)}
 payload_field() {
+  case "$1" in "" | *[!A-Za-z0-9_.]*) ;; *)
+    if [ "${_nv_pf_loaded:-0}" = 1 ] && [ "$payload" = "${_nv_pf_src:-}" ]; then
+      case " ${nv_payload_fields:-} " in *" $1 "*)
+        # ast-grep-ignore: no-bash-eval — D3 reads only a variable name built from the validated literal path; payload values are never eval input.
+        eval 'printf "%s\n" "${_nv_pf_'"${1//./__}"'-}"'
+        return 0
+        ;;
+      esac
+    fi
+    ;;
+  esac
   if command -v jq >/dev/null 2>&1; then
     printf '%s' "$payload" | jq -r ".$1 // empty" 2>/dev/null && return 0
   fi
@@ -122,10 +135,95 @@ payload_field() {
 extract_cmd() {
   payload_field tool_input.command
 }
+
+# payload_fields VAR=path… — several fields, ONE process (spec 0054 R22, D10).
+# Each `payload_field` call forks a subshell plus jq/node; a hook that needs two
+# or more fields up front pays that per field. Here a single jq (or node) emits
+# every field followed by a NUL and closes with the sentinel `END` NUL.
+#
+# NEVER SHIFTS A FIELD (challenge B3). `tool_input.command` is model-controlled,
+# and JSON `\u0000` decodes to a NUL byte, which would end that field early and
+# slide the next value (`cwd`, `session_id`, a role) into the wrong variable. So
+# the producer REFUSES to emit anything when any value holds a NUL, and the shell
+# reads exactly N fields plus the sentinel with nothing after it. Any anomaly —
+# a NUL, a missing or extra field, empty output for a non-empty payload, a
+# producer that failed — discards the whole read and repeats it field by field
+# with `payload_field`, i.e. exactly today's behaviour. A variable is never left
+# empty "because the read went wrong" (that would read as "allowed").
+#
+# Values match `$(payload_field …)`: trailing newlines stripped, `null` and
+# `false` empty, non-strings as compact JSON. Paths are dotted and written HERE,
+# never user input. Works under bash 3.2 and zsh: no arrays, `printf -v` to assign.
+_payload_fields_read() {
+  local _pf_spec _pf_val _pf_end _pf_extra
+  for _pf_spec in "$@"; do
+    IFS= read -r -d '' _pf_val || return 1
+    # Suffix removal is quadratic in bash even without a newline. Only values
+    # ending in one need command substitution's native trailing-newline trim.
+    case "$_pf_val" in *$'\n') _pf_val=$(printf '%s' "$_pf_val") ;; esac
+    printf -v "${_pf_spec%%=*}" '%s' "$_pf_val" || return 1
+  done
+  IFS= read -r -d '' _pf_end || return 1
+  [ "$_pf_end" = END ] || return 1
+  if IFS= read -r -d '' _pf_extra; then return 1; fi
+  [ -z "$_pf_extra" ] || return 1
+  return 0
+}
+payload_fields() {
+  local _pf_spec _pf_filter="" _pf_paths="" _pf_cached=1
+  [ "$#" -gt 0 ] || return 0
+  for _pf_spec in "$@"; do
+    case " ${nv_payload_fields:-} " in *" ${_pf_spec#*=} "*) ;; *) _pf_cached=0 ;; esac
+  done
+  if [ "$_pf_cached" = 1 ] && [ "${_nv_pf_loaded:-0}" = 1 ] && [ "$payload" = "${_nv_pf_src:-}" ]; then
+    for _pf_spec in "$@"; do
+      printf -v "${_pf_spec%%=*}" '%s' "$(payload_field "${_pf_spec#*=}")"
+    done
+    return 0
+  fi
+  if [ -z "$payload" ]; then
+    for _pf_spec in "$@"; do printf -v "${_pf_spec%%=*}" '%s' ""; done
+    return 0
+  fi
+  for _pf_spec in "$@"; do
+    _pf_filter="$_pf_filter(.${_pf_spec#*=}? // \"\" | tostring),"
+    _pf_paths="$_pf_paths ${_pf_spec#*=}"
+  done
+  _pf_filter="[${_pf_filter%,}] as \$v | if all(\$v[]; any(explode[]; . == 0) | not) then (\$v[] | ., \"\\u0000\"), \"END\\u0000\" else empty end"
+  if command -v jq >/dev/null 2>&1; then
+    _payload_fields_read "$@" < <(printf '%s' "$payload" | jq -j "$_pf_filter" 2>/dev/null) && return 0
+  fi
+  if command -v node >/dev/null 2>&1; then
+    _payload_fields_read "$@" < <(printf '%s' "$payload" | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{try{const j=JSON.parse(s);let o="";for(const p of process.argv[1].trim().split(" ")){let v=j;for(const k of p.split("."))v=v?.[k];const t=v==null||v===false?"":typeof v==="string"?v:JSON.stringify(v);if(t.includes("\0"))return;o+=t+"\0"}process.stdout.write(o+"END\0")}catch{}})' "$_pf_paths" 2>/dev/null) && return 0
+  fi
+  for _pf_spec in "$@"; do
+    printf -v "${_pf_spec%%=*}" '%s' "$(payload_field "${_pf_spec#*=}")"
+  done
+  return 0
+}
+
+# Spec 0055 D3: load once in the parent shell, inherited by command substitutions.
+# Only literal, validated paths form variable names; payload values are never eval'd.
+# Keep the old cache ineligible while loading, including its per-field fallback.
+payload_load() {
+  [ "${_nv_pf_loaded:-0}" = 1 ] && [ "$payload" = "${_nv_pf_src:-}" ] && return 0
+  local _pl_path
+  [ -z "${ZSH_VERSION:-}" ] || setopt local_options sh_word_split
+  set --
+  for _pl_path in ${nv_payload_fields:-}; do
+    case "$_pl_path" in "" | *[!A-Za-z0-9_.]*) return 1 ;; esac
+    set -- "$@" "_nv_pf_${_pl_path//./__}=$_pl_path"
+  done
+  _nv_pf_loaded=0
+  payload_fields "$@"
+  _nv_pf_src=$payload
+  _nv_pf_loaded=1
+}
 # NOT called here on purpose. `payload_field` may spawn a process, and
 # `routing-watch.sh` — which includes this partial and runs after EVERY tool call
 # in every session — never reads `cmd`. Each consumer that wants it calls
 # `extract_cmd` itself, at the point where it already knows it needs it.
+payload_load
 # Spec 0035 D2: nv_tool()/nv_edited_paths() normalize Codex's `apply_patch`/
 # `spawn_agent` tool names and multi-file patches to the shapes this hook
 # already handles for Claude.
@@ -151,14 +249,21 @@ extract_cmd() {
 #
 # Depends on `payload`/`payload_field` (the `extract-cmd` partial): include
 # `extract-cmd` in the same script whenever this partial's helpers are used —
-# `payload_field` is only CALLED here (inside functions), never at top level,
-# so include order between the two partials does not matter.
+# Load in the parent before the Codex/Pi include-time cwd read. The hook declares
+# nv_payload_fields before its includes; repeated loads of identical input are free.
+payload_load
 case "$0" in
   *".codex/hooks/"*) nv_engine=codex ;;
+  # Spec 0048 D2: Pi runs a COPY of each shared script from `.pi/navori/hooks/`
+  # through its extension bridge, which sends a Claude-shaped payload (tool names
+  # `Bash`/`Edit`/`Write`, `tool_input`, `cwd`). Every existing `= codex` branch
+  # keeps the Claude semantics for `pi`; behavior that exists only on Pi goes in
+  # an explicit `[ "$nv_engine" = pi ]` branch, never in a shared one.
+  *"/.pi/navori/"*) nv_engine=pi ;;
   *) nv_engine=claude ;;
 esac
 
-if [ "$nv_engine" = codex ]; then
+if [ "$nv_engine" = codex ] || [ "$nv_engine" = pi ]; then
   nv_cwd=$(payload_field cwd)
   # `cwd` is the session's working dir, which may be a workspace subdir in a
   # monorepo; the project root is always the git toplevel from there. Falls
@@ -221,6 +326,39 @@ nv_subagent_type() {
   fi
 }
 
+# The agent a spawn call TARGETS, never the one that makes the call (spec 0041
+# H16). Claude: `tool_input.subagent_type`. Codex PreToolUse/PostToolUse of a
+# spawn: `tool_input.agent_type` only — the top-level `agent_type` there is the
+# CALLER's. On `SubagentStop` the top-level `agent_type` IS the finishing
+# subagent, so that event reads it instead.
+nv_spawn_target_type() {
+  if [ "$nv_engine" = codex ]; then
+    case "$(payload_field hook_event_name)" in
+      SubagentStop) payload_field agent_type ;;
+      *) payload_field tool_input.agent_type ;;
+    esac
+  else
+    payload_field tool_input.subagent_type
+  fi
+}
+
+# The agent RUNNING the current event: the top-level `agent_type`, which the
+# host adds only inside a subagent (empty on the main thread). Never confuse it
+# with `nv_spawn_target_type` (H16). `nv_subagent_type` above keeps its legacy
+# mixed behaviour for existing hooks; new code uses these two helpers.
+nv_event_agent_type() {
+  payload_field agent_type
+}
+
+# True for the spawn tool: Codex V1 `spawn_agent`, or any V2 name that ends in
+# `spawn_agent` (V2 flattens the namespace into the tool name).
+nv_is_spawn_tool() {
+  case "$(payload_field tool_name)" in
+    *spawn_agent) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # Deliberately NO `nv_emit_context` helper here. `hook-output-contract.test.ts`
 # ("los partials no hablan con el host, solo escriben al log") holds every
 # `_partials/*.sh` file to zero host-output vocabulary — a partial is inlined
@@ -240,12 +378,14 @@ nv_subagent_type() {
 # Depends on `payload`/`payload_field` (`extract-cmd`) and `nv_project_dir` /
 # `nv_progress_dir` (`hook-input`); include both in the same script.
 #
-# THE SUCCESS LANE. The host runs a criterion's `command` in its own Bash tool;
+# THE EVIDENCE LANE. The host runs a criterion's `command` in its own Bash tool;
 # `PostToolUse` fires only on success, so this lane's very firing is the success
 # signal. It appends ONE line per matching pending criterion to
 # `<state dir>/workplan_<feature>.evidence.jsonl`, which `plan update` compares
 # against the criterion and the current tree (`lib/plan/evidence.ts`). It never
 # runs the criterion's command and never writes anything but that line.
+# Claude failure events use the same writer only with a recognized structured
+# comparison; they never enter the legacy success path.
 #
 # FAIL-OPEN, NO PARTIAL LINE. Every path returns 0. The line is built entirely in
 # memory and written by a single `printf >>` as the LAST step, so a kill at any
@@ -278,11 +418,24 @@ navori_tree_fingerprint() {
     scratch=$(navori_git rev-parse --path-format=absolute --git-path navori-fp-index 2>/dev/null) || exit 1
     [ -n "$scratch" ] || exit 1
     [ ! -e "$scratch.lock" ] || exit 1
+    local stage=${2:-}
+    if [ -n "$stage" ]; then
+      case "$stage" in /* | *[[:cntrl:]]* | *\\* | */../* | ../* | */.. | */./* | ./*) exit 1 ;; esac
+      local physical
+      physical=$(cd "$stage" 2>/dev/null && pwd -P) || exit 1
+      [ "$physical" = "$(pwd -P)/$stage" ] || exit 1
+      [ -f "$stage/state.json" ] && [ ! -L "$stage/state.json" ] || exit 1
+      [ ! -L "$stage/STATUS.md" ] || exit 1
+    fi
     work=$(mktemp -d "${TMPDIR:-/tmp}/navori-fp.XXXXXX" 2>/dev/null) || exit 1
     trap 'rm -f "$work"/list "$work"/files "$work"/links "$work"/paths "$work"/shas; rmdir "$work" 2>/dev/null' EXIT
+    local exclusions=()
+    [ -z "$stage" ] || exclusions=(":(exclude,literal)$stage/state.json" ":(exclude,literal)$stage/STATUS.md")
+    # Same set as `IDENTITY_EXCLUDES` (`PROGRESS_DIRS` + `.claude/worktrees`) in
+    # `lib/primitives/content-identity.ts`; the line is stamped `"fp":2` (R20).
     navori_git ls-files -z --cached --others --exclude-standard --deduplicate -- . \
-      ':(exclude).navori/state' ':(exclude).claude/progress' ':(exclude).codex/progress' \
-      ':(exclude).claude/worktrees' > "$work/list" 2>/dev/null || exit 1
+      ':(exclude).claude/progress' ':(exclude).codex/progress' ':(exclude).navori/state' \
+      ':(exclude)progress' ':(exclude).claude/worktrees' ${exclusions[@]+"${exclusions[@]}"} > "$work/list" 2>/dev/null || exit 1
     : > "$work/links"
     while IFS= read -r -d '' p; do
       case "$p" in *$'\n'*) exit 1 ;; esac
@@ -323,8 +476,16 @@ navori_json_str() {
 # Repeat-failure state is shared by the PostToolUseFailure watcher and the
 # existing success lane. A successful Bash call only pays for Node when its
 # session already has a failure-state file; ordinary calls use builtins only.
+#
+# `action` is `reset`/`failure` (Claude: the event says which) or `codex`
+# (spec 0041 T12: Codex fires PostToolUse on failure too, so the OUTCOME is read
+# from the rollout, `$2` = its path, `$3` = the call's `tool_use_id`).
 navori_bash_failure_state() {
   local action=$1 sid=${CLAUDE_CODE_SESSION_ID:-} dir file
+  if [ "$action" = codex ]; then
+    navori_plain_field session_id
+    sid=$navori_field
+  fi
   case "$sid" in "" | *[!A-Za-z0-9._-]*) return 0 ;; esac
   [ -n "${nv_project_dir:-}" ] || return 0
   dir=$nv_project_dir/.navori/state/hooks/bash-outcome-watch
@@ -334,24 +495,58 @@ navori_bash_failure_state() {
   fi
   command -v node >/dev/null 2>&1 || return 0
   NV_BASH_OUTCOME_ACTION=$action NV_BASH_OUTCOME_DIR=$dir NV_BASH_OUTCOME_FILE=$file \
+    NV_BASH_OUTCOME_SID=$sid NV_BASH_OUTCOME_TRANSCRIPT=${2:-} NV_BASH_OUTCOME_TOOL_USE=${3:-} \
     NV_BASH_OUTCOME_ROOT=$nv_project_dir node -e '
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const digest = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const env = process.env;
+// Codex outcome (spec 0041 T12): the exit code of THIS call lives in the rollout
+// record `event_msg`/`item_completed` whose `item.id` is the `tool_use_id` of the call
+// (probe V4). Bounded to the tail of the file; only `exit_code` is read, never
+// the output fields. Anything missing or unreadable -> null -> silence.
+const codexExit = () => {
+  const max = 1048576;
+  const fd = fs.openSync(env.NV_BASH_OUTCOME_TRANSCRIPT, "r");
+  try {
+    const size = fs.fstatSync(fd).size;
+    const len = Math.min(size, max);
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, size - len);
+    const lines = buf.toString("utf8").split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (!line.includes(env.NV_BASH_OUTCOME_TOOL_USE) || !line.includes("item_completed")) continue;
+      let record;
+      try { record = JSON.parse(line); } catch { continue; }
+      const item = record?.payload?.item;
+      if (record?.type !== "event_msg" || record?.payload?.type !== "item_completed") continue;
+      if (item?.type !== "CommandExecution" || item?.id !== env.NV_BASH_OUTCOME_TOOL_USE) continue;
+      return Number.isInteger(item.exit_code) ? item.exit_code : null;
+    }
+    return null;
+  } finally { fs.closeSync(fd); }
+};
 let input = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => { input += chunk; });
 process.stdin.on("end", () => {
   try {
     const payload = JSON.parse(input);
-    if (payload.tool_name !== "Bash" || payload.session_id !== env.CLAUDE_CODE_SESSION_ID) return;
+    if (payload.tool_name !== "Bash" || payload.session_id !== env.NV_BASH_OUTCOME_SID) return;
     if (payload.is_interrupt === true || payload.tool_response?.is_interrupt === true) return;
     const command = payload.tool_input?.command;
     const cwd = payload.cwd;
     if (typeof command !== "string" || !command.trim() || typeof cwd !== "string" || !cwd) return;
     const agent = typeof payload.agent_id === "string" ? payload.agent_id : "";
+    let action = env.NV_BASH_OUTCOME_ACTION;
+    let exitCode = null;
+    if (action === "codex") {
+      exitCode = codexExit();
+      if (exitCode === null) return;
+      action = exitCode === 0 ? "reset" : "failure";
+    }
     const key = digest(JSON.stringify([command.trim().replace(/\s+/g, " "), cwd, agent]));
     const root = path.resolve(env.NV_BASH_OUTCOME_ROOT);
     const dir = env.NV_BASH_OUTCOME_DIR;
@@ -360,21 +555,21 @@ process.stdin.on("end", () => {
     for (const component of [root, path.join(root, ".navori"), path.join(root, ".navori/state"), path.join(root, ".navori/state/hooks"), dir]) {
       if (fs.existsSync(component)) {
         if (!fs.lstatSync(component).isDirectory() || fs.lstatSync(component).isSymbolicLink()) return;
-      } else if (env.NV_BASH_OUTCOME_ACTION === "failure") {
+      } else if (action === "failure") {
         fs.mkdirSync(component);
       } else return;
     }
     if (fs.existsSync(file) && (!fs.lstatSync(file).isFile() || fs.lstatSync(file).isSymbolicLink())) return;
     let rows = fs.existsSync(file) ? fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line)) : [];
     if (!Array.isArray(rows) || rows.some((row) => typeof row.key !== "string" || typeof row.sig !== "string" || typeof row.count !== "number" || typeof row.epoch !== "number")) return;
-    if (env.NV_BASH_OUTCOME_ACTION === "reset") {
+    if (action === "reset") {
       const next = rows.filter((row) => row.key !== key);
       if (next.length === rows.length) return;
       rows = next;
     } else {
-      const error = payload.error;
+      const error = exitCode === null ? payload.error : "";
       if (typeof error !== "string") return;
-      const match = /exit code\s+(\d+)/i.exec(error);
+      const match = exitCode === null ? /exit code\s+(\d+)/i.exec(error) : [null, String(exitCode)];
       if (!match) return;
       const code = match[1];
       const escapedRoot = root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -386,10 +581,11 @@ process.stdin.on("end", () => {
         .replace(/(?:\/tmp|\/private\/tmp|\/var\/folders)\/[^\s:]+/g, "<tmp>")
         .replace(/\b\d{4}-\d\d-\d\d[T ]\d\d:\d\d:\d\d(?:\.\d+)?Z?\b/g, "<t>")
         .replace(/\b\d\d:\d\d:\d\d(?:\.\d+)?\b/g, "<t>")
-        .replace(/\b\d+(?:\.\d+)?\s?(?:ms|seconds?|minutes?)\b/gi, "<d>")
+        .replace(/\b\d+(?:\.\d+)?\s?(?:ms|s|m|seconds?|minutes?)\b/gi, "<d>")
+        .replace(/\b(?:duration_ms|duration|time|elapsed)\b[:=\s]+\d+(?:\.\d+)?/gi, "<d>")
         .replace(/\b[0-9a-f]{8,}\b/gi, "<h>")
         .split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 20).join("\n");
-      if (!body) return;
+      if (!body && exitCode === null) return;
       const sig = digest(code + "\n" + body);
       const previous = rows.find((row) => row.key === key);
       const count = previous?.sig === sig ? Math.min(previous.count + 1, 3) : 1;
@@ -398,7 +594,7 @@ process.stdin.on("end", () => {
       rows.push({ key, sig, count, notified: notified || count === 3, epoch: Date.now() });
       if (count === 3 && !notified) {
         const first = body.split("\n")[0].slice(0, 100);
-        const note = `navori: el comando ${command.trim().slice(0, 100)} falló 3 veces con la misma firma (exit ${code}: ${first}). Cambia de enfoque con debug-failure o escala al usuario. Si el rojo es intencional, ignora esta nota.`;
+        const note = `navori: el comando ${command.trim().slice(0, 100)} falló 3 veces con la misma firma (exit ${code}${first ? ": " + first : ""}). Cambia de enfoque con debug-failure o escala al usuario. Si el rojo es intencional, ignora esta nota.`;
         var output = note.slice(0, 400);
       }
     }
@@ -414,21 +610,185 @@ process.stdin.on("end", () => {
   return 0
 }
 
-# Called by `routing-watch.sh` once it knows the tool is `Bash`, and only under
-# `claude-post-tool-use` (Codex fires PostToolUse on failure too, so no signal).
+# A plain top-level string field of the raw payload, with builtins only (no
+# fork), into `navori_field`. Matches `"key":"value"` with an unescaped quote
+# before the colon, which a `tool_response` cannot forge (inside it every quote is
+# `\"`). Empty when absent, spaced or escaped: the caller treats that as silence.
+navori_plain_field() {
+  local needle="\"$1\":\"" rest
+  navori_field=
+  case "$payload" in *"$needle"*) ;; *) return 0 ;; esac
+  rest=${payload#*"$needle"}
+  navori_field=${rest%%\"*}
+  case "$navori_field" in *\\*) navori_field= ;; esac
+  return 0
+}
+
+# Spec 0041 T12 (R11): the Codex Bash outcome lane, run by `routing-watch.sh`
+# on `PostToolUse(Bash)` under Codex. Codex fires PostToolUse on failure too, so
+# the exit code is read from the rollout (`transcript_path`): a fixed-string grep
+# over the BOUNDED tail finds the `item_completed` record of this `tool_use_id`.
+# A success with no failure state costs no Node; everything else (a failure, or a
+# success that must reset a counter) goes through `navori_bash_failure_state`,
+# which parses only `exit_code`. FAIL-OPEN and silent: no rollout, no matching
+# record or an unreadable one means no advice. Prints the advice, if any.
+navori_bash_codex_outcome() {
+  local tid tp sid line
+  navori_plain_field tool_use_id
+  tid=$navori_field
+  navori_plain_field transcript_path
+  tp=$navori_field
+  navori_plain_field session_id
+  sid=$navori_field
+  case "$tid" in "" | *[!A-Za-z0-9._:-]*) return 0 ;; esac
+  case "$sid" in "" | *[!A-Za-z0-9._-]*) return 0 ;; esac
+  case "$tp" in *.jsonl) ;; *) return 0 ;; esac
+  [ -f "$tp" ] && [ -r "$tp" ] || return 0
+  line=$(tail -c 1048576 "$tp" 2>/dev/null | grep -F -- "$tid" 2>/dev/null | grep -F '"item_completed"' 2>/dev/null | tail -n 1)
+  [ -n "$line" ] || return 0
+  case "$line" in
+    *'"exit_code":0,'* | *'"exit_code":0}'*)
+      [ -f "${nv_project_dir:-}/.navori/state/hooks/bash-outcome-watch/$sid" ] || return 0
+      ;;
+  esac
+  navori_bash_failure_state codex "$tp" "$tid"
+  return 0
+}
+
+ # Codex 0.162.1 observed CommandExecution: argv, file-URL cwd and completed exit.
+ # Missing effective cwd/command or an uncorrelated item never produces evidence.
+navori_codex_acceptance_payload() {
+  NV_CODEX_PAYLOAD="$payload" node -e '
+const fs = require("node:fs");
+const { fileURLToPath } = require("node:url");
+try {
+  const p = JSON.parse(process.env.NV_CODEX_PAYLOAD);
+  if (!p.tool_use_id || !p.transcript_path || p.is_interrupt || p.tool_input?.run_in_background) process.exit(0);
+  const fd = fs.openSync(p.transcript_path, "r");
+  let lines;
+  try {
+    const size = fs.fstatSync(fd).size;
+    const len = Math.min(size, 1048576);
+    const b = Buffer.alloc(len);
+    fs.readSync(fd, b, 0, len, size-len);
+    lines = b.toString("utf8").split("\n");
+  } finally { fs.closeSync(fd); }
+  for (let i = lines.length-1; i >= 0; i--) {
+    let r; try { r = JSON.parse(lines[i]); } catch { continue; }
+    const item = r?.payload?.item;
+    if (r?.type !== "event_msg" || r?.payload?.type !== "item_completed" || item?.type !== "CommandExecution" || item.id !== p.tool_use_id) continue;
+    if (item.exit_code !== 0 || item.status !== "completed" || typeof item.cwd !== "string") break;
+    if (!Array.isArray(item.command) || item.command.length !== 3 || !["-lc", "-c"].includes(item.command[1]) || item.command[2] !== p.tool_input?.command) break;
+    const cwd = item.cwd.startsWith("file:") ? fileURLToPath(item.cwd) : item.cwd;
+    if (!cwd.startsWith("/") || /[\r\n]/.test(cwd)) break;
+    process.stdout.write(JSON.stringify({...p, cwd}));
+    break;
+  }
+} catch {}'
+}
+
+# Compare only CLI-indexed predicates. Payload and output remain on stdin/in memory;
+# stdout contains comparison scalars only. No command is executed or output persisted.
+navori_bash_expected_fields() {
+  [ -s "$1" ] && [ ! -L "$1" ] || return 0
+  command -v node >/dev/null 2>&1 || return 0
+  printf '%s' "$payload" | NV_EXPECTED_INDEX=$1 NV_EXPECTED_FEATURE=$f NV_EXPECTED_ID=$i \
+    NV_EXPECTED_DIR=$d NV_EXPECTED_BINDING=$binding NV_EXPECTED_STAGE=$stage \
+    NV_EXPECTED_COMMAND=$c NV_EXPECTED_MODE=${2:-} node -e '
+const fs = require("node:fs");
+const vm = require("node:vm");
+const env = process.env;
+let input = "", inputBytes = 0, oversized = false;
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", chunk => {
+  inputBytes += Buffer.byteLength(chunk);
+  if (inputBytes > 32 * 1024 * 1024) oversized = true;
+  if (!oversized) input += chunk;
+});
+process.stdin.on("end", () => {
+  try {
+    const fd = fs.openSync(env.NV_EXPECTED_INDEX, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    let rows;
+    try {
+      if (!fs.fstatSync(fd).isFile() || fs.fstatSync(fd).size > 4 * 1024 * 1024) return;
+      rows = fs.readFileSync(fd, "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line));
+    } finally { fs.closeSync(fd); }
+    const matches = rows.filter(row => row.feature === env.NV_EXPECTED_FEATURE && row.id === env.NV_EXPECTED_ID &&
+      row.dir === env.NV_EXPECTED_DIR && row.stage === env.NV_EXPECTED_STAGE &&
+      JSON.stringify(row.binding) === (env.NV_EXPECTED_BINDING || "null") &&
+      typeof row.command === "string" && JSON.stringify(row.command).slice(1,-1) === env.NV_EXPECTED_COMMAND);
+    if (matches.length !== 1) return;
+    const row = matches[0];
+    if (typeof row.expected !== "string" || !row.spec || row.spec.kind === "free") return;
+    const result = { expected: row.expected, outcome: "unevaluated" };
+    const emit = () => process.stdout.write(JSON.stringify(result));
+    if (oversized) { emit(); return; }
+    const p = JSON.parse(input);
+    if (p.tool_name !== "Bash" || p.tool_input?.command !== row.command || p.tool_input?.run_in_background) return;
+    const spec = row.spec;
+    if (env.NV_EXPECTED_MODE === "failure") {
+      if (p.is_interrupt === true || typeof p.error !== "string" || /Command timed out/.test(p.error)) return;
+      const code = /^Exit code ([1-9]\d{0,2})(?:\r?\n|$)/.exec(p.error);
+      if (!code || Number(code[1]) > 255) return;
+      result.exit = Number(code[1]);
+    } else {
+      if (p.is_interrupt === true || p.tool_response?.interrupted === true) { emit(); return; }
+      result.exit = 0;
+    }
+    if (spec.kind === "exit" && Number.isInteger(spec.code) && spec.code >= 0 && spec.code <= 255) {
+      result.outcome = result.exit === spec.code ? "pass" : "fail";
+    } else if (["contains", "matches"].includes(spec.kind)) {
+      if (result.exit !== 0) result.outcome = "fail";
+      else {
+        const response = p.tool_response;
+        if (!response || typeof response.stdout !== "string" || typeof response.stderr !== "string" || response.isImage === true) { emit(); return; }
+        const output = response.stdout + "\n" + response.stderr;
+        if (Buffer.byteLength(output) > 4 * 1024 * 1024 || /\[\d+ characters truncated\]/.test(output)) { emit(); return; }
+        if (spec.kind === "contains" && typeof spec.text === "string" && spec.text.length > 0)
+          result.outcome = output.includes(spec.text) ? "pass" : "fail";
+        else if (spec.kind === "matches" && typeof spec.source === "string" && typeof spec.flags === "string" && /^[imsu]*$/.test(spec.flags)) {
+          // Fixed code, data-only context, bounded execution even for pathological regexes.
+          try {
+            result.outcome = new vm.Script("new RegExp(source, flags).test(output)").runInNewContext(
+              { source: spec.source, flags: spec.flags, output }, { timeout: 100 }) ? "pass" : "fail";
+          } catch { result.outcome = "unevaluated"; }
+        }
+      }
+    }
+    emit();
+  } catch {}
+});' 2>/dev/null
+}
+
+# Shared writer: Claude success/failure pass an explicit mode; Codex enters only
+# after a correlated completed success and never evaluates output predicates.
 navori_bash_success_lane() {
-  local idx=$nv_project_dir/$nv_progress_dir/acceptance-index
+  # The index lives in the checkout that ran `plan update`: the git toplevel of
+  # the payload `cwd` (a linked worktree has a `.git` FILE, main a directory),
+  # found by a builtin-only parent walk (no process on the fast path). No `.git`
+  # ancestor, or an odd `cwd`: the project dir, as before.
+  local top=$nv_project_dir
+  navori_plain_field cwd
+  case "$navori_field" in
+    /*)
+      local w=$navori_field
+      while :; do
+        if [ -e "$w/.git" ]; then top=$w; break; fi
+        [ -n "$w" ] || break
+        w=${w%/*}
+      done
+      ;;
+  esac
+  local idx=$top/$nv_progress_dir/acceptance-index
   [ -s "$idx" ] || return 0
   # A backgrounded call "succeeds" when it LAUNCHES, not when it finishes; an
   # interrupted one did not complete.
-  case "$payload" in
-    *'"run_in_background":true'* | *'"interrupted":true'*) return 0 ;;
-  esac
-  local c f i d hits=
-  while IFS=$'\t' read -r c f i d; do
+  case "$payload" in *'"run_in_background":true'*) return 0 ;; esac
+  local c f i d binding stage hits=
+  while IFS=$'\t' read -r c f i d binding stage; do
     [ -n "$c" ] || continue
     case "$payload" in
-      *'"command":"'"$c"'"'[,}]*) hits="$hits$c"$'\t'"$f"$'\t'"$i"$'\t'"$d"$'\n' ;;
+      *'"command":"'"$c"'"'[,}]*) hits="$hits$c"$'\t'"$f"$'\t'"$i"$'\t'"$d"$'\t'"$binding"$'\t'"$stage"$'\n' ;;
     esac
   done < "$idx"
   [ -n "$hits" ] || return 0
@@ -441,18 +801,22 @@ navori_bash_success_lane() {
   tree=$(navori_git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || return 0
   case "$cwd$tree" in *[[:cntrl:]]*) return 0 ;; esac
   head=$(navori_git -C "$tree" rev-parse HEAD 2>/dev/null) || head=
-  wt=$(navori_tree_fingerprint "$tree") || return 0
-  [ -n "$wt" ] || return 0
   htree=$(navori_git -C "$tree" rev-parse 'HEAD^{tree}' 2>/dev/null) || htree=
-  dirty=true
-  [ "$wt" = "$htree" ] && dirty=false
   sid=$(payload_field session_id | tr -cd 'A-Za-z0-9._-')
   agent=$(payload_field agent_id | tr -cd 'A-Za-z0-9._-')
   ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   root=$(pwd -P 2>/dev/null) || root=$nv_project_dir
+  # A checkout other than the project's receives evidence only when it is a
+  # worktree of the SAME repository (equal git common dir): never a foreign repo.
+  if [ "$tree" != "$nv_project_dir" ] && [ "$tree" != "$root" ]; then
+    local ctree cproj
+    ctree=$(navori_git -C "$tree" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+    cproj=$(navori_git -C "$nv_project_dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+    [ -n "$ctree" ] && [ "$ctree" = "$cproj" ] || return 0
+  fi
 
-  local line extra file
-  while IFS=$'\t' read -r c f i d; do
+  local line extra file comparison
+  while IFS=$'\t' read -r c f i d binding stage; do
     [ -n "$f" ] || continue
     # The index is CLI-written state, but the hook is the one that opens a path
     # taken from it: slug and id shapes, an absolute directory inside this
@@ -462,16 +826,39 @@ navori_bash_success_lane() {
       A[0-9]*) case "${i#A}" in *[!0-9]*) continue ;; esac ;;
       *) continue ;;
     esac
-    case "$d" in "$root"/* | "$nv_project_dir"/*) ;; *) continue ;; esac
+    case "$d" in "$root"/* | "$nv_project_dir"/* | "$tree"/*) ;; *) continue ;; esac
     case "$d" in *[[:cntrl:]]* | */../* | */..) continue ;; esac
     [ -d "$d" ] && [ ! -L "$d" ] || continue
     file=$d/workplan_$f.evidence.jsonl
     [ ! -L "$file" ] || continue
+    if [ -n "$binding" ]; then
+      [ -n "$stage" ] || continue
+      case "$binding" in '{'*'}') ;; *) continue ;; esac
+    elif [ -n "$stage" ]; then continue
+    fi
+    comparison=
+    case "${1:-}" in
+      claude | failure)
+        if [ "${nv_engine:-}" = claude ]; then
+          comparison=$(navori_bash_expected_fields "$top/$nv_progress_dir/acceptance-expected.jsonl" "${1:-}") || comparison=
+        fi
+        ;;
+    esac
+    # Failure events never imply success; old/free predicates retain their old lane.
+    if [ "${1:-}" = failure ] && [ -z "$comparison" ]; then continue; fi
+    case "$payload" in *'"interrupted":true'*) [ -n "$comparison" ] || continue ;; esac
+    wt=$(navori_tree_fingerprint "$tree" "$stage") || continue
+    [ -n "$wt" ] || continue
+    dirty=true
+    [ "$wt" = "$htree" ] && dirty=false
     # `$c` is already JSON-escaped: it is the index's own field.
     extra=
     [ -z "$sid" ] || extra=$extra',"sessionId":"'$sid'"'
     [ -z "$agent" ] || extra=$extra',"agentId":"'$agent'"'
-    line='{"ts":"'$ts'","feature":"'$f'","id":"'$i'","command":"'$c'","tree":"'$(navori_json_str "$tree")'","cwd":"'$(navori_json_str "$cwd")'","head":"'$head'","worktreeTree":"'$wt'","dirty":'$dirty$extra'}'
+    [ -z "$binding" ] || extra=$extra',"deliveryBinding":'$binding
+    [ -z "$comparison" ] || extra=$extra','${comparison#\{}
+    [ -z "$comparison" ] || extra=${extra%\}}
+    line='{"ts":"'$ts'","feature":"'$f'","id":"'$i'","command":"'$c'","tree":"'$(navori_json_str "$tree")'","cwd":"'$(navori_json_str "$cwd")'","head":"'$head'","worktreeTree":"'$wt'","fp":2,"dirty":'$dirty$extra'}'
     printf '%s\n' "$line" >> "$file" 2>/dev/null || true
   done <<NAVORI_HITS
 $hits
@@ -514,75 +901,80 @@ navori_audit_repo_from_cwd() {
   esac
   basename "$navori_audit_repo_cwd" 2>/dev/null
 }
-# Shared audit-mode event recorder — inlined into each managed hook at render
-# time (see the include directive in the source scripts + lib/render/hook-includes.ts).
-#
-# WHY (spec 0013): a hook is only visible to the transcript when it BLOCKS or
-# INJECTS context. Every hook that runs and lets the action through is invisible,
-# so `navori audit` could never answer "did the gate run, and what did it cost?".
-# The transcript cannot be fixed — it is the host's format — so the harness
-# records its own execution instead, and the session log becomes the source of
-# truth for what the harness did.
-#
-# Expects `$payload` (the raw hook payload on stdin) to be in scope, and reads
-# `$navori_audit_t0` for the start instant. Both are set by `navori_audit_begin`.
-#
-# Every variable read here carries a `:-` default ON PURPOSE: most managed hooks
-# run under `set -euo pipefail`, where an unset variable ABORTS the hook. A
-# recorder that can abort the thing it observes is worse than no recorder, so the
-# partial must be safe to inline into `set -u` and `set +e` alike.
-#
-# FAIL-OPEN ABSOLUTE, and this matters more here than anywhere else: this code is
-# inlined into hooks whose own contract is to never break a session. Observation
-# must never become the reason an action fails, so every path returns 0 and
-# nothing is ever written to stdout — a stray byte there would be interpreted by
-# the host as hook output (context injection, or a block reason).
+# Shared advisory metadata recorder. The CLI is the single writer of the session log.
+# The only shell write is one noclobber event file inside the CLI-created 0700 spool dir.
+# The CLI re-validates every file before it reaches the log. No human content, no other
+# redirects and no fallback writes are permitted here (spec 0054 D8; pinned by a drift test).
+# Missing CLI or failed validation leaves an observation gap, never a hook failure.
+# zsh replaces $0 with the function name; preserve the enclosing script identity.
+navori_audit_script=$0
+# Spec 0055 D4: the session's own id, read with builtins only. Succeeds (sets
+# navori_audit_sid) only when the key "session_id" appears exactly once and its value
+# is the same `id` shape the jq in navori_audit_record_metadata accepts. Anything else
+# (absent, duplicated, escaped, odd value) fails: the caller falls back to auditing.
+navori_audit_sid_read() {
+  navori_audit_sid=
+  case ${payload:-} in *'"session_id"'*) ;; *) return 1 ;; esac
+  # Consume quote-delimited chunks in this shell: wildcard prefix searches and
+  # duplicate scans can become quadratic with a large input before or after the key.
+  navori_audit_sr=
+  {
+    IFS= read -r -d '"' navori_audit_sv || :
+    while IFS= read -r -d '"' navori_audit_sv; do
+      if [ "$navori_audit_sv" = session_id ]; then
+        IFS= read -r -d '' navori_audit_sr || :
+        break
+      fi
+    done
+  } <<< "$payload"
+  case $navori_audit_sr in *'"session_id"'*) return 1 ;; esac
+  navori_audit_sr=${navori_audit_sr#"${navori_audit_sr%%[![:space:]]*}"}
+  case $navori_audit_sr in :*) navori_audit_sr=${navori_audit_sr#:} ;; *) return 1 ;; esac
+  navori_audit_sr=${navori_audit_sr#"${navori_audit_sr%%[![:space:]]*}"}
+  case $navori_audit_sr in \"*) navori_audit_sr=${navori_audit_sr#\"} ;; *) return 1 ;; esac
+  navori_audit_sv=${navori_audit_sr%%\"*}
+  [ "$navori_audit_sv" != "$navori_audit_sr" ] || return 1
+  case $navori_audit_sv in "" | *[!A-Za-z0-9_-]*) return 1 ;; esac
+  [ "${#navori_audit_sv}" -le 256 ] || return 1
+  navori_audit_sid=$navori_audit_sv
+}
 
-# Start the clock — but only after establishing that anything will be recorded.
-#
-# THE COST OF BEING OFF is the number that matters here: this code is inlined
-# into hooks that fire on EVERY Bash call, and audit-mode is off for virtually
-# every session of every user. An earlier version ran `perl` plus two `jq`
-# invocations before it ever checked whether a log existed — three processes per
-# hook, four hooks per command, ~48 ms on every single shell call for a feature
-# nobody had turned on.
-#
-# So the gate is a pure-builtin one first: the per-repo audit directory only
-# exists once audit-mode has been activated in this repo at least once. No
-# subprocess, no parsing. Everything expensive lives behind it.
+# Is there a regular, non-symlink file named "$1" in any repo dir under the audit root
+# (dot-prefixed repo names included: the default glob skips them)? "$1" is
+# `session-<id>.log` or `.armed`. Builtins and globs only. zsh needs null_glob
+# (localised here) or an unmatched glob aborts the hook.
+navori_audit_has_file() {
+  [ -z "${ZSH_VERSION:-}" ] || setopt local_options null_glob
+  for navori_audit_hf in "$navori_audit_root"/*/"$1" "$navori_audit_root"/.[!.]*/"$1" "$navori_audit_root"/..?*/"$1"; do
+    [ -f "$navori_audit_hf" ] && [ ! -L "$navori_audit_hf" ] && return 0
+  done
+  return 1
+}
+
+# Audit only when the session has an active log (or an arm to consume). With a readable
+# session id and no log there is nothing to record, so no timestamp (no perl) is paid.
+# Doubt of any kind keeps today's behaviour: audit on.
 navori_audit_begin() {
   navori_audit_on=0
-
-  navori_audit_root=${NAVORI_AUDITS_ROOT:-}
-  if [ -z "$navori_audit_root" ]; then
-    [ -n "${HOME:-}" ] || return 0
-    navori_audit_root=$HOME/.navori/audits
-  fi
-
-  # The gate tests the audit ROOT, not the per-repo directory.
-  #
-  # Deriving the repo cheaply would mean `${CLAUDE_PROJECT_DIR##*/}` — and that
-  # is WRONG: the authoritative repo comes from the payload's `cwd`, and the two
-  # differ whenever a hook fires inside an agent worktree, since the hook process
-  # starts in the main repo (#454). A gate built on the wrong name would silently
-  # record nothing exactly where the harness runs its parallel work.
-  #
-  # The root alone is enough for what this gate is for: a user who has never
-  # activated audit-mode anywhere has no `~/.navori/audits`, so the common case
-  # costs one stat and zero processes. Someone who does use audit-mode pays the
-  # parsing — which is the cost of the feature they turned on.
+  navori_audit_gate_pending=0
+  navori_audit_root=${NAVORI_AUDITS_ROOT:-${HOME:-}/.navori/audits}
+  [ -n "${HOME:-}${NAVORI_AUDITS_ROOT:-}" ] || return 0
   [ -d "$navori_audit_root" ] || return 0
-
+  if navori_audit_sid_read; then
+    if navori_audit_has_file "session-$navori_audit_sid.log"; then
+      :
+    elif case "${navori_audit_phase:-}" in SessionStart | UserPromptSubmit) true ;; *) false ;; esac &&
+      navori_audit_has_file ".armed"; then
+      :
+    else
+      navori_audit_gate_pending=1
+      return 0
+    fi
+  fi
   navori_audit_on=1
   navori_audit_t0=$(navori_audit_now)
 }
 
-# Milliseconds since epoch, spending a process only when it has to.
-#
-# `$EPOCHREALTIME` is a BUILTIN in bash 5 and in zsh (with zsh/datetime, which
-# the harness's zsh path already has): no fork at all. Only a shell without it
-# pays for `perl`, and only a machine without perl degrades to whole seconds —
-# `date` has no portable millisecond format (GNU has %s%3N, BSD does not).
 navori_audit_now() {
   if [ -n "${EPOCHREALTIME:-}" ]; then
     # `1756... .123456` → milliseconds, with pure parameter expansion.
@@ -594,51 +986,34 @@ navori_audit_now() {
     || printf '%s' $(( $(date +%s 2>/dev/null || echo 0) * 1000 ))
 }
 
-# navori_audit_log <verdict> [reason]
-#
-# `name`, `phase`, `tool` and `source` come from the caller's own variables,
-# which the render sets per hook — the partial never guesses which hook it is
-# inlined into.
-navori_audit_log() {
-  # The builtin-only gate from `navori_audit_begin`: when audit-mode was never
-  # activated in this repo, nothing below runs and no process is spawned.
-  [ "${navori_audit_on:-0}" = "1" ] || return 0
-  # No payload, no jq, no clock → nothing to record. Each of these is a normal
-  # state for a hook that bailed early, not an error worth surfacing.
-  [ -n "${payload:-}" ] || return 0
-  command -v jq >/dev/null 2>&1 || return 0
+# One spool file per event: `{"v":1,"host":…,"metadata":{…}}`, built by a single jq so the
+# JSON is well-formed whatever the payload held. Args: metadata JSON. Needs
+# navori_audit_spool and navori_audit_host. Returns non-zero when nothing was written.
+navori_audit_spool_write() {
+  navori_audit_event=$(jq -cn --arg host "$navori_audit_host" --argjson m "$1" \
+    '{v:1,host:$host,metadata:$m}' 2>/dev/null) || return 1
+  [ -n "$navori_audit_event" ] && [ "${#navori_audit_event}" -le 4096 ] || return 1
+  navori_audit_stamp=${EPOCHREALTIME:-0}
+  navori_audit_stamp=${navori_audit_stamp//[.,]/}
+  ( set -C; umask 077; printf '%s\n' "$navori_audit_event" > "$navori_audit_spool/$navori_audit_stamp-$$-$RANDOM.json" ) 2>/dev/null || return 1
+  return 0
+}
 
-  # ONE jq for every field, not one per field: this runs on each hook of each
-  # Bash call, and a fork is the most expensive thing in it. Newline-separated,
-  # read back positionally.
-  # The third field is the OWNER, and it is never empty: inside a subagent the
-  # host sends a real `agent_id`; on the main thread it sends none and the
-  # literal below names the orchestrator explicitly.
-  #
-  # It used to be `// ""`, and the empty case did not stay empty — it came out
-  # as the `cwd`. Command substitution strips trailing newlines, so an empty
-  # third field left `$navori_audit_fields` with only two lines; then
-  # `${rest#*<NL>}` found no newline in `"cwd"` and POSIX says a `#` pattern
-  # that does not match returns the string UNCHANGED. 41,581 of the park's
-  # 52,460 recorded owners (79%) were a filesystem path for that reason.
-  #
-  # The consumer's behaviour does not change — `ownerOf` looks the value up
-  # among the session's agents and sends anything that names nobody to the
-  # orchestrator, which is where a path already went — but the record stops
-  # claiming the repo directory is an agent. Old logs keep working through the
-  # same "names nobody" branch.
-  #
-  # The trailing "." is a sentinel, not data: with it the third field is always
-  # followed by a newline, so the `%%` below cannot fall into the same trap if
-  # a future field is ever empty.
-  #
-  # The owner is picked with an explicit "first non-empty string", NOT with
-  # `.agent_id // .subagent_id // "orchestrator"`. In jq only `null` and `false`
-  # are falsy, so a host that sends the key with an EMPTY string satisfies `//`
-  # and the chain yields `""` — the field then disappears from the record and
-  # `ownerOf` falls back to the time window, which is the guess this field
-  # exists to avoid. Caught by a test, not by review.
-  navori_audit_fields=$(printf '%s' "${payload:-}" | jq -r '[.session_id // "", .cwd // "", ([.agent_id, .subagent_id] | map(select(type == "string" and . != "")) | first) // "orchestrator", .tool_use_id // "", "."] | .[]' 2>/dev/null) || return 0
+# Resolve one exact marker before invoking the metadata writer. Startup may
+# offer a repo-scoped arm candidate; the CLI authoritatively validates private
+# modes, ownership and header identity before either append or spool creation.
+navori_audit_record_metadata() {
+  [ -n "${payload:-}" ] || return 0
+  navori_audit_root=${NAVORI_AUDITS_ROOT:-${HOME:-}/.navori/audits}
+  [ -n "${HOME:-}${NAVORI_AUDITS_ROOT:-}" ] || return 0
+  [ -d "$navori_audit_root" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  navori_audit_fields=$(printf '%s' "$payload" | jq -er '
+    def id: type == "string" and length > 0 and length <= 256 and test("^[A-Za-z0-9_-]+$");
+    def agent: id or (type == "string" and length <= 256 and test("^pi-[a-z]+-[A-Za-z0-9_:-]+$"));
+    select(.session_id | id) |
+    [.session_id, (if (.cwd | type) == "string" then .cwd else "" end),
+     ([.agent_id, .subagent_id] | map(select(agent)) | first) // "orchestrator", "."] | .[]' 2>/dev/null) || return 0
   navori_audit_session=${navori_audit_fields%%
 *}
   navori_audit_rest=${navori_audit_fields#*
@@ -649,140 +1024,89 @@ navori_audit_log() {
 }
   navori_audit_agent=${navori_audit_rest%%
 *}
-  navori_audit_rest=${navori_audit_rest#*
-}
-  navori_audit_tool_use_id=${navori_audit_rest%%
-*}
-  [ -n "$navori_audit_session" ] || return 0
-  # Same character class the CLI enforces (#503): the id composes a path, so
-  # anything path-shaped means the payload is not what we think it is.
-  case "$navori_audit_session" in
-    *[!A-Za-z0-9_-]*) return 0 ;;
-  esac
-
   [ -n "$navori_audit_cwd" ] || navori_audit_cwd=$PWD
   navori_audit_repo=$(navori_audit_repo_from_cwd "$navori_audit_cwd") || return 0
-  [ -n "$navori_audit_repo" ] || return 0
-
+  case "$navori_audit_repo" in "" | . | .. | *[!A-Za-z0-9_.-]*) return 0 ;; esac
   navori_audit_file=$navori_audit_root/$navori_audit_repo/session-$navori_audit_session.log
-
-  # The session may not be the marked one even in a repo that has been audited
-  # before. Also the writability check — a log that cannot be appended to is not
-  # an error, it is simply not recording.
-  if [ ! -f "$navori_audit_file" ]; then
-    # SPOOL for the phase that CANNOT have a log yet (#778).
-    #
-    # `navori audit --start` is what creates the session log, and it runs from
-    # the UserPromptSubmit hook — i.e. after the first prompt. Every SessionStart
-    # hook therefore fires BEFORE the file exists, and the check above threw its
-    # record away every single time: measured, `session-start-context` recorded 1
-    # of ~20 startups in this repo, and the only survivor was a resume onto an
-    # already-open log. "Did the session load the harness?" had no witness at all,
-    # which is exactly the question the recorder exists to answer.
-    #
-    # So those records go to a side file that `--start` absorbs. Two deliberate
-    # limits keep this from becoming a leak:
-    #
-    #   1. SessionStart ONLY. Every other phase runs after a prompt, so a missing
-    #      log there means the session is genuinely not marked — and spooling
-    #      those would write four lines per Bash call, for every session of every
-    #      repo, forever. That is thousands of writes to buy nothing.
-    #   2. Only where the repo's audit directory ALREADY exists, which means the
-    #      repo has been audited (or armed) at least once. `mkdir` is never run
-    #      from here: a repo that has never used audit-mode must stay at zero
-    #      files and zero forks, the same contract as the root gate above. The
-    #      cost is that the FIRST audited session of a repo still loses its
-    #      SessionStart records; every one after it has them.
-    #
-    # FAIL-OPEN, and here more than anywhere: this runs while a session is
-    # opening. Every failure path below returns 0 and writes nothing to stdout —
-    # a spool that could abort a hook would make observation the reason a session
-    # does not start, which is the one bug this partial may never have.
-    [ "${navori_audit_phase:-}" = "SessionStart" ] || return 0
-    [ -d "$navori_audit_root/$navori_audit_repo" ] || return 0
-    navori_audit_file=$navori_audit_root/$navori_audit_repo/pending-$navori_audit_session.jsonl
-    if [ ! -e "$navori_audit_file" ]; then
-      : >> "$navori_audit_file" 2>/dev/null || return 0
-    fi
+  if [ ! -f "$navori_audit_file" ] || [ -L "$navori_audit_file" ]; then
+    [ "${navori_audit_phase:-}" = SessionStart ] || return 0
+    navori_audit_arm=$navori_audit_root/$navori_audit_repo/.armed
+    [ -f "$navori_audit_arm" ] && [ ! -L "$navori_audit_arm" ] || return 0
   fi
-  [ -w "$navori_audit_file" ] || return 0
-
-  # Volume valve, OFF by default.
-  #
-  # `PreToolUse(Bash)` chains four hooks, so every shell command leaves four
-  # lines and most are `skip` — a long session runs to thousands. Set
-  # NAVORI_AUDIT_SKIP_NOOPS=1 to drop the ones that did nothing.
-  #
-  # Default off on purpose: a `skip` is the ONLY evidence that a hook ran and
-  # decided it had no business acting, which is exactly what distinguishes it
-  # from a hook that never executed — the question that motivated recording
-  # hooks at all. The valve trades that away knowingly; it must not be the
-  # silent default.
-  if [ "${NAVORI_AUDIT_SKIP_NOOPS:-0}" = "1" ]; then
-    case "$1" in
-      skip|noop) return 0 ;;
-    esac
+  case "${nv_engine:-}" in
+    claude | codex | pi) navori_audit_host=$nv_engine ;;
+    *) case "$navori_audit_script" in
+      *".codex/hooks/"* | *".codex/scripts/"*) navori_audit_host=codex ;;
+      *".pi/navori/hooks/"* | *".pi/navori/scripts/"*) navori_audit_host=pi ;;
+      *) navori_audit_host=claude ;;
+    esac ;;
+  esac
+  # Spool lane (spec 0054 R26, D8): when `navori audit --start` created this session's
+  # spool dir, drop ONE event file there instead of starting the CLI. The dir must be a
+  # real directory we own (not a symlink); the file is created with noclobber (O_EXCL:
+  # never overwrites, never follows a symlink planted at that name) under umask 077.
+  # The CLI re-validates host, categories and size when it consolidates. Anything
+  # unusual — no dir, wrong owner, failed write — falls through to the CLI bridge below.
+  navori_audit_spool=$navori_audit_root/$navori_audit_repo/spool-$navori_audit_session
+  # `navori_audit_no_spool` (set by audit-mode-close) forces the CLI: the session-end
+  # event is what makes the CLI consolidate the spool.
+  if [ -z "${navori_audit_no_spool:-}" ] && [ -d "$navori_audit_spool" ] && [ ! -L "$navori_audit_spool" ] && [ -O "$navori_audit_spool" ]; then
+    navori_audit_spool_write "$1" && return 0
   fi
+  command -v navori >/dev/null 2>&1 || return 0
+  # The writer assigns eventId/wireVersion before first persistence. Replay
+  # keeps those identifiers; this transport never generates replacement IDs.
+  printf '%s' "$1" | navori audit --record-metadata --host "$navori_audit_host" \
+    --root-session "$navori_audit_session" --repo "$navori_audit_repo" \
+    --root "$navori_audit_root" >/dev/null 2>&1 || :
+  return 0
+}
 
+# Only closed categories and bounded technical identifiers cross this bridge.
+# Args: verdict, reason, kind. `reason` is recorded only when it is one of the
+# allowlisted codes below (mirrored by HOOK_REASON_CODES in lib/audit/model.ts,
+# pinned by a drift test); any other non-empty text is stored as "unspecified".
+# `kind` defaults from the verdict (block -> hard, ask -> ask); `deny` stays
+# explicit because the confirm hooks use it as deny-as-confirmation on Codex.
+navori_audit_log() {
+  navori_audit_race=0
+  if [ "${navori_audit_on:-0}" != 1 ]; then
+    # The log may have been born during this hook (audit-mode-trigger, or a parallel hook
+    # of the same event): record with ms 0, there was no t0 (spec 0055 R9).
+    [ "${navori_audit_gate_pending:-0}" = 1 ] && [ -n "${navori_audit_sid:-}" ] || return 0
+    navori_audit_has_file "session-$navori_audit_sid.log" || return 0
+    navori_audit_race=1
+  fi
+  command -v jq >/dev/null 2>&1 || return 0
+  if [ "${NAVORI_AUDIT_SKIP_NOOPS:-0}" = 1 ]; then
+    case "${1:-}" in skip | noop) return 0 ;; esac
+  fi
   navori_audit_end=$(navori_audit_now)
+  [ "$navori_audit_end" -ge 0 ] 2>/dev/null || navori_audit_end=0
   navori_audit_ms=$(( navori_audit_end - ${navori_audit_t0:-$navori_audit_end} ))
   [ "$navori_audit_ms" -ge 0 ] 2>/dev/null || navori_audit_ms=0
-
-  # `tsMs` is the instant at the resolution the log actually needs (#685): the
-  # `ts` below truncates to the second, and 84% of a measured session's events
-  # share their second with another one. This value is already computed — the
-  # duration above is derived from it — so recording it costs nothing.
-  #
-  # Validated with the same `-ge 0` idiom as `ms`, and for the same reason: it
-  # is passed as `--argjson`, so a non-numeric value would make the whole `jq`
-  # fail and the event would vanish instead of merely losing a field.
-  [ "$navori_audit_end" -ge 0 ] 2>/dev/null || navori_audit_end=0
-
-  # `ts` is NOT stamped here, and that is the whole point of #696: it was a
-  # `date` fork per event — 46,850 of them across this store — for a string
-  # fully derivable from the `tsMs` above, which `$EPOCHREALTIME` already
-  # produced without spawning anything. The file's own cost doctrine (see
-  # `navori_audit_now`) says spend a process only when there is no other way;
-  # keeping this one made the comment lie four lines under the value that
-  # refutes it.
-  #
-  # Nothing downstream lost a field: `parse.ts` derives the ISO from `tsMs`
-  # when the record carries none, and logs written before this still have
-  # theirs. The lifecycle records — `start`, `stop`, `session-end` — keep a real
-  # `ts`, so a human reading the raw `.log` still has dated anchors; those are
-  # ~3 per session, not one per hook.
-  # `navori_audit_agent` came out of the same single jq above. It is what lets
-  # the report attribute a hook to a subagent WITHOUT guessing: with agents
-  # running in parallel their time windows overlap, so attribution by timestamp
-  # is the fallback, not the primary route.
-  #
-  # It is recorded, never trusted as an agent identity by itself (#560). What
-  # `.agent_id` means depends on the PHASE: on the tool phases it is stable —
-  # 485 events of one measured session carried 11 distinct ids, and the
-  # subagents' resolved to real transcripts — but on `SubagentStop` the host
-  # sends a fresh id per firing: 112 distinct ids for 117 firings, 102 of them
-  # matching nothing under `~/.claude`. So a consumer that resolves this field
-  # must treat "names nobody" as invalid data rather than as a different agent
-  # (`ownerOf` in `lib/audit/parse.ts` is where that rule lives).
-
-  printf '%s\n' "$(jq -cn \
-    --arg name "${navori_audit_name:-unknown}" \
-    --arg phase "${navori_audit_phase:-unknown}" \
-    --arg verdict "${1:-unknown}" \
-    --arg reason "${2:-}" \
-    --arg tool "${navori_audit_tool:-}" \
-    --arg src "${navori_audit_source:-core}" \
-    --arg agent "${navori_audit_agent:-}" \
-    --arg toolUseId "${navori_audit_tool_use_id:-}" \
-    --argjson ms "$navori_audit_ms" \
-    --argjson tsMs "$navori_audit_end" \
-    '{tsMs:$tsMs,event:"hook",name:$name,phase:$phase,verdict:$verdict,ms:$ms,source:$src}
-     + (if $tool   == "" then {} else {tool:$tool}       end)
-     + (if $reason == "" then {} else {reason:$reason}   end)
-     + (if $agent  == "" then {} else {agentId:$agent}   end)
-     + (if $toolUseId == "" then {} else {toolUseId:$toolUseId} end)' 2>/dev/null)" \
-    >> "$navori_audit_file" 2>/dev/null
-
+  [ "$navori_audit_race" = 0 ] || navori_audit_ms=0
+  navori_audit_metadata=$(printf '%s' "${payload:-}" | jq -c \
+    --arg name "${navori_audit_name:-unknown}" --arg phase "${navori_audit_phase:-unknown}" \
+    --arg verdict "${1:-unknown}" --arg reason "${2:-}" \
+    --arg tool "${navori_audit_tool:-}" --arg source "${navori_audit_source:-core}" \
+    --arg kind "${3:-}" --argjson ms "$navori_audit_ms" --argjson tsMs "$navori_audit_end" '
+    def id: type == "string" and length > 0 and length <= 256 and test("^[A-Za-z0-9_-]+$");
+    def agent: id or (type == "string" and length <= 256 and test("^pi-[a-z]+-[A-Za-z0-9_:-]+$"));
+    def invocation: type == "string" and length > 0 and length <= 256 and test("^[A-Za-z0-9_:-]+$");
+    def technical_label: if length <= 256 and test("^[A-Za-z0-9_.:-]+$") then . else "unknown" end;
+    {event:"hook",name:($name|technical_label),source:($source|technical_label),ms:$ms,tsMs:$tsMs,
+     phase:(if (["PreToolUse","PostToolUse","SessionStart","SessionEnd","Stop","SubagentStart","SubagentStop","UserPromptSubmit","PreCompact"]|index($phase)) != null then $phase else "unknown" end),
+     verdict:(if (["allow","ask","block","deny","skip","noop","clean","dirty","inject","repeat","partial","compact-advice","gate-started","gate-killed"]|index($verdict)) != null then $verdict else "unknown" end),
+     agentId:(([.agent_id,.subagent_id]|map(select(agent))|first)//"orchestrator")}
+     + (if (.tool_use_id|invocation) then {toolUseId:.tool_use_id} else {} end)
+     + (if (["Bash","Edit","Read","Write","Agent","Task","NotebookEdit"]|index($tool)) != null then {tool:$tool} else {} end)
+     + (if $reason == "" then {}
+        elif (["oversize","no-verify","force-push-base","rm-root","rm-var","no-preserve-root","fork-bomb","block-device","managed-rewrite","binary-missing","plan-denied","subcommand-unavailable","native-hook","foreign-repo","foreign-gate"]|index($reason)) != null then {reason:$reason}
+        else {reason:"unspecified"} end)
+     + (($kind | if . == "" then (if $verdict == "block" then "hard" elif $verdict == "ask" then "ask" else "" end) else . end) as $k
+        | if (["hard","ask","advisory"]|index($k)) != null then {kind:$k} else {} end)' 2>/dev/null) || return 0
+  navori_audit_record_metadata "$navori_audit_metadata"
   return 0
 }
 navori_audit_begin
@@ -885,7 +1209,32 @@ esac
 # in the payload, and writes one complete line with a single `printf >>` or none.
 if [ "$tool" = "Bash" ] && [ "${1:-}" = "claude-post-tool-use" ]; then
   navori_bash_failure_state reset
-  navori_bash_success_lane
+  navori_bash_success_lane claude
+fi
+
+# Spec 0041 T12 (R11): the Codex Bash outcome lane, same hook, no new
+# registration (the Codex hooks-per-Bash count stays pinned). Codex fires
+# PostToolUse on failure too, so the outcome comes from the rollout record of
+# this `tool_use_id`, never from the event. Silent on any missing piece; it only
+# registers acceptance only with a correlated completed command/effective cwd,
+# and prints the repeated-failure advice that Claude's bash-outcome-watch gives.
+# SHORTCUT: when it advises it ends the run, so that one call is not counted
+# toward the routing threshold; ceiling one call per three repeated failures,
+# trigger: if routing counts must stay exact, merge both notes into one output.
+if [ "$tool" = "Bash" ] && [ "$nv_engine" = codex ]; then
+  navori_acceptance_payload=$(navori_codex_acceptance_payload 2>/dev/null) || navori_acceptance_payload=
+  if [ -n "$navori_acceptance_payload" ]; then
+    navori_original_payload=$payload
+    payload=$navori_acceptance_payload
+    navori_bash_success_lane
+    payload=$navori_original_payload
+  fi
+  navori_codex_advice=$(navori_bash_codex_outcome 2>/dev/null) || navori_codex_advice=
+  if [ -n "$navori_codex_advice" ]; then
+    navori_audit_log "advise" "same Bash failure reached three consecutive occurrences"
+    NV_ADVICE="$navori_codex_advice" node -e 'process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:"PostToolUse",additionalContext:process.env.NV_ADVICE}})+"\n")' 2>/dev/null || true
+    exit 0
+  fi
 fi
 
 # Rung 1 of the Bash lane, and the earliest point at which it can end. No write
@@ -895,7 +1244,13 @@ fi
 # locate a stamp it will never open, for the same reason a `Read` does not pay
 # for the `case` above.
 if [ "$tool" = "Bash" ]; then
-  navori_has_write_token "${payload:-}" || exit 0
+  # Bash substitutions are quadratic on multi-MiB output. The loaded command is
+  # already exact; large responses must not enter the payload-wide write probe.
+  if [ "${#payload}" -gt 1048576 ] && [ "${_nv_pf_loaded:-0}" = 1 ] && [ "$payload" = "${_nv_pf_src:-}" ]; then
+    navori_has_write_token "${_nv_pf_tool_input__command:-}" || exit 0
+  else
+    navori_has_write_token "${payload:-}" || exit 0
+  fi
 fi
 
 # One stamp per session, so two concurrent sessions never overwrite each other's

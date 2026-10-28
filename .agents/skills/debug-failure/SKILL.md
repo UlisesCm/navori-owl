@@ -13,7 +13,7 @@ metadata:
   maxWords: 850
 ---
 
-<!-- navori:managed id="debug-failure-base" hash="74e93458" version="0.11.1" source="@navori/core" fmkeys="name,description,metadata" -->
+<!-- navori:managed id="debug-failure-base" hash="59054bb9" version="0.12.3" source="@navori/core" fmkeys="name,description,metadata" -->
 # Debug failure — the one cycle
 
 A failure is not a mandate to change code. This skill forces diagnosis before any fix, and forces a hypothesis re-check when the fix doesn't clear the symptom.
@@ -28,7 +28,7 @@ The trigger is **"I don't know why it failed yet"**, not the size of the output.
 4. **Apply a single fix** against the root cause found in step 3, then re-run and re-classify. Don't fire several fixes at once against the symptoms, and don't bundle an unrelated "improvement" into the same change.
 5. **If the fix doesn't clear the symptom on the first post-fix repro, stop patching and re-validate the hypothesis** — don't escalate with a second patch on top of the first. Re-read the original symptom (literally, not from memory), state the diff you applied in one sentence ("changed X in file:line from Y to Z because W"), and check whether W logically implies the symptom should be gone. If it should and isn't, the model of the flow is incomplete — there's a step you're not seeing (caching, a different runtime side, a middleware, stale state). Pick ONE new hypothesis before touching code again.
 6. **After two failed attempts on the same bug, stop and escalate — the channel depends on where you're running:**
-   - **Inside a subagent** (no `AskUserQuestion`): report `BLOCKED` in your handoff file, with the original symptom, each hypothesis tried, its applied fix and its repro result, and the hypothesis you'd try next with the evidence behind it. The caller decides, you don't invent a fourth patch.
+   - **Inside a subagent** (no way to ask the user): report `BLOCKED` in your handoff file, with the original symptom, each hypothesis tried, its applied fix and its repro result, and the hypothesis you'd try next with the evidence behind it. The caller decides, you don't invent a fourth patch.
    - **In the main agent**: ask the user directly with the same four items — symptom, tried hypotheses + results, next hypothesis + evidence — and a concrete question ("do you know more context that supports or refutes this?").
 
 Once step 4's repro is clean, apply `verify-before-done` before declaring the fix complete — this skill validates the SYMPTOM is gone, `verify-before-done` validates the rest of the gate still is.
