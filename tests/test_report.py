@@ -17,6 +17,7 @@ from owl.variants import Variant
 # Covers: R22, R23, R24, R29, R30, R31, R33, R38 (whole module)
 
 BASE, PLACEBO, HARNESS = "vanilla-default", "placebo", "navori"
+AGENT_VERSION = Variant.load(BASE).agent_version
 OK = {"reward": 1, "verifier_complete": 1, "baseline_valid": 1, "f2p": 1, "p2p": 1, "scope": 1}
 TEST_FILE = "packages/core/test/core.test.ts"
 
@@ -32,7 +33,7 @@ class Lab:
         rdir.mkdir(parents=True)
         (rdir / "preamble.md").write_text("work autonomously")
         (rdir / "round.yaml").write_text(yaml.safe_dump({
-            "id": "r1", "model": "anthropic/claude-haiku-4-5-20251001", "agent_version": "2.1.281",
+            "id": "r1", "model": "anthropic/claude-haiku-4-5-20251001", "agent_version": AGENT_VERSION,
             "variants": [BASE, PLACEBO, HARNESS], "baseline": BASE, "placebo": PLACEBO,
             "tasks": [f"tasks/{t}" for t in tasks], "k": k, "retries": 1, "limits": {"agent_timeout_multiplier": 3.0, "agent_setup_timeout_multiplier": 2.0, "max_turns": 300, "max_budget_usd": "5.00"}, "jobs_dir": "jobs/r1",
             "prices_usd_per_mtok": {"input": 1, "output": 5, "cache_read": 0.1, "cache_write_5m": 1.25, "cache_write_1h": 2},
@@ -59,7 +60,7 @@ class Lab:
         trial = job / f"{task}__abc"
         (trial / "agent").mkdir(parents=True)
         (trial / "verifier").mkdir()
-        meta = {"id": variant, "agent": "claude-code", "agent_version": "2.1.281", "block": block, "attempt": attempt,
+        meta = {"id": variant, "agent": "claude-code", "agent_version": AGENT_VERSION, "block": block, "attempt": attempt,
                 "expect": {"plugins": [], "mcp_servers": []}}
         (job / "owl-variant.json").write_text(json.dumps(meta))
         (trial / "config.json").write_text(json.dumps({"task": {"path": str(self.root / "tasks" / task)}}))

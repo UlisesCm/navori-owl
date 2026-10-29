@@ -1,3 +1,19 @@
+## 2026-10-28 18:20 Pi — r1-refresco E1: plataforma al corte (Harbor, Claude Code, harnesses, prefijos)
+
+## Goal
+Fijar la plataforma de r1 al corte 2026-10-28 (r1-refresco E1, M1-M3).
+## Discoveries
+- Harbor 0.25.0 no requirió cambios en ClaudeCodeHarness ni CheatAgent; trial real vanilla-default 00-smoke con OAuth: gate PASS ok, reward=1, $0.033.
+- navori 0.12.3 movió handoffs a .navori/state/handoffs/ y estado de hooks a .navori/state/hooks/; su plugin de engram instala releases/latest (v3.6.0 al corte).
+- superpowers v7.0.1 conserva prefijos (citas nuevas); ponytail 09c434ab escribe solo fuera de /app.
+## Accomplished
+- M1 harbor==0.25.0; M2 agent_version 2.1.312 en las 6 variantes de r1, navori 0.12.3 + engram 3.6.0, superpowers v7.0.1, ponytail 09c434ab; M3 auditoría de prefijos en specs/f3-ronda1/artifacts-audit.md y manifiestos actualizados.
+- Gate: ruff check . y uv run pytest -q (docker incluido) 396 passed.
+## Next Steps
+- Mergear E1; r1-refresco E2 (gentle-ai v4.3.1, Haiku 5.5, piloto).
+## Relevant Files
+- pyproject.toml, uv.lock, variants/*.yaml, tests/test_variants.py, tests/test_report.py, specs/f3-ronda1/artifacts-audit.md, specs/r1-refresco/tasks.md.
+
 ## 2026-10-28 16:30 Pi — Suite docker de nuevo en verde: umask del verifier y fixture con /tests
 
 ## Goal

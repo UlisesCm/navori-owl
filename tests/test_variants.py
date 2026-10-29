@@ -49,10 +49,11 @@ def test_artifacts_prefix_rules(fake_repo: Path, prefix: str) -> None:
 # Covers: R7, R8, R9
 def test_navori_progress_is_artifact() -> None:
     v = Variant.load("navori")
-    assert ".claude/progress/" in v.artifacts
+    assert ".navori/state/handoffs/" in v.artifacts
     assert "progress/" in v.artifacts
     assert "progress/" not in v.runtime_state
-    assert ".claude/progress/" not in v.runtime_state
+    assert ".navori/state/handoffs/" not in v.runtime_state
+    assert ".navori/state/hooks/" in v.runtime_state
     assert ".claude/worktrees/" in v.runtime_state
 
 
@@ -165,3 +166,12 @@ def test_harness_version_required_with_plugins_or_init(fake_repo: Path) -> None:
 def test_harness_variants_declare_release(vid: str) -> None:
     v = Variant.load(vid)
     assert v.version and v.upstream
+
+
+R1_VARIANTS = ["vanilla-default", "navori", "gentle-ai", "superpowers", "ponytail", "placebo"]
+
+
+# Covers: R1 (r1-refresco)
+def test_round_variants_share_agent_version() -> None:
+    """Every round-1 variant runs the same Claude Code release, pinned at the cutoff."""
+    assert {Variant.load(vid).agent_version for vid in R1_VARIANTS} == {"2.1.312"}

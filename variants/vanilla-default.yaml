@@ -2,7 +2,7 @@
 id: vanilla-default
 description: Claude Code sin harness, modo por defecto (auto-discovery activo).
 agent: claude-code
-agent_version: "2.1.281"
+agent_version: "2.1.312"
 harness: {}
 expect:
   plugins: []

@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    "harbor==0.23.0",
+    "harbor==0.25.0",
     "pyyaml>=6",
 ]
 
