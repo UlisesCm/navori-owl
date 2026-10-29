@@ -1,3 +1,19 @@
+## 2026-10-28 19:30 Pi — Alcance MVP: solo navori; revisión 5 de specs en curso
+
+## Goal
+Reducir la ronda 1 a navori por decisión del usuario y avanzar r1-refresco E2.
+## Discoveries
+- gentle-ai v4.3.1 retiró SDD/openspec; su instalador quita el MCP de engram de usuario tras instalar el plugin, así que el `expect` necesitaría claude real. Se pausó por la decisión de alcance.
+- report.py tenía "10 líneas" fijo en la matriz primaria; con 3 variantes la familia es m = 4.
+## Accomplished
+- gentle-ai v4.3.1 (spike, manifiesto, auditoría) en commit local a2042db de feat/r1-refresco-e2, sin push.
+- Revisión 5 parcial: f3-ronda1 (R1, R6 diferido, R27, D2, decisión 1, round.yaml, A6/T29/T38) y contexto de r1-refresco; report.py usa el tamaño real de la familia, con prueba.
+- Gate: ruff check . && uv run pytest -m 'not docker' → 312 passed.
+## Next Steps
+- Terminar revisión 5 (r1-refresco R4/M4/design, spec check), aprobación del usuario y PR; luego M5 (precios Haiku 5.5 y piloto).
+## Relevant Files
+- specs/f3-ronda1/{requirements,design,tasks}.md, specs/r1-refresco/requirements.md, owl/report.py, tests/test_report.py.
+
 ## 2026-10-28 18:20 Pi — r1-refresco E1: plataforma al corte (Harbor, Claude Code, harnesses, prefijos)
 
 ## Goal

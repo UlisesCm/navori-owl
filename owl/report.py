@@ -322,7 +322,8 @@ def _analysis_stats(round_def: Round) -> dict:
 
 
 def _primary(round_def: Round, cells: dict[tuple[str, str], list[Trial]], tasks: list[str]) -> tuple[list, list, list]:
-    """Primary matrix (10 lines, one Holm), success beside each line, and the placebo estimates (D2, D12)."""
+    """Primary matrix (cost and behavior per non-baseline variant, one Holm), success beside each line,
+    and the placebo estimates (D2, D12)."""
     stats = _analysis_stats(round_def)
     harnesses = [v for v in round_def.variants if v != round_def.baseline]
     success = []
@@ -760,7 +761,7 @@ def _md_primary(r: dict) -> str:
             "sí" if line["differs"] else "no", "éxito " + _fmt(s),
         ])
     return (
-        "## 5. Matriz primaria contra la base (un solo Holm, 10 líneas)\n\n"
+        f"## 5. Matriz primaria contra la base (un solo Holm, {len(r['primary'])} líneas)\n\n"
         + _table(["variante", "endpoint", "estimación", "p crudo", "p Holm", "difiere", "éxito al lado"], rows)
         + "\n\nSin diferencia detectada no es evidencia de igualdad."
     )

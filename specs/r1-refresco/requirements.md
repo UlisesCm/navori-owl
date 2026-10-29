@@ -8,6 +8,9 @@ Decisión del usuario: antes del pre-registro, la ronda mide las versiones vigen
 Este spec es la primera instancia del procedimiento de `specs/round-protocol/` y deja a
 `specs/f3-ronda1/` listo para su entrega de conformidad y pre-registro.
 
+Revisión 5 (2026-10-28), con decisión del usuario: hasta terminar el MVP, navori es el único harness
+bajo prueba. R4 (gentle-ai v4) queda diferido; E2 se reduce a modelo y piloto (M5).
+
 ## Requirements (EARS)
 
 ### Plataforma

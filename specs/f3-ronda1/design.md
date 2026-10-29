@@ -1,5 +1,10 @@
 # F3 — Ronda 1 — Design
 
+> **Revisión 5 (2026-10-28).** Decisión del usuario: hasta terminar el MVP, navori es el único harness
+> bajo prueba. La ronda corre `vanilla-default`, `navori` y `placebo` (decisión 1); la familia primaria
+> pasa a m = 4 (D2). D3 (gentle-ai) y las menciones de `superpowers` y `ponytail` quedan como diseño
+> diferido: sus manifiestos siguen en `variants/` sin entrar a la ronda.
+
 > **Revisión 4 (2026-10-28).** Decisión del usuario: refrescar la ronda a las versiones vigentes en una
 > fecha de corte antes del pre-registro y pasar el modelo a Haiku 5.5. Cambian D1, D3 (nota de v4), D21
 > y el ejemplo de `round.yaml` en Contracts; entra D22 (pins al corte). El refresco y el piloto
@@ -18,7 +23,8 @@
 
 ## Decisiones del usuario (fijas)
 
-1. **6 variantes:** `vanilla-default`, `navori`, `gentle-ai`, `superpowers`, `ponytail`, `placebo`.
+1. **3 variantes (revisión 5):** `vanilla-default`, `navori`, `placebo`. Hasta la revisión 4 eran 6
+   (más `gentle-ai`, `superpowers`, `ponytail`); vuelven a decidirse después del MVP.
    `vanilla-bare` queda fuera: exige `ANTHROPIC_API_KEY` y la ronda corre con la suscripción.
 2. **k = 5, Haiku 4.5** (`anthropic/claude-haiku-4-5-20251001`) con OAuth. ~450 trials sobre 12 tareas
    dev + 3 holdout.
@@ -121,8 +127,8 @@ por sus eventos vecinos; allowlist de red; redacción del holdout en `owl gate`.
 
 ### D2 — Variantes, baseline y familias (R1, R26–R29)
 - **Baseline:** `vanilla-default` (VISION D2).
-- **Familia primaria (m = 10, un solo Holm):** {costo, comportamiento} × {`navori`, `gentle-ai`,
-  `superpowers`, `ponytail`, `placebo`}, cada una contra `vanilla-default` (D12).
+- **Familia primaria (m = 4, un solo Holm; revisión 5):** {costo, comportamiento} × {`navori`,
+  `placebo`}, cada una contra `vanilla-default` (D12). Hasta la revisión 4: m = 10 con cinco variantes.
 - **Éxito:** descriptivo, al lado de cada línea primaria (D12).
 - **Contra `placebo` (secundaria):** estimaciones con intervalo al 95% de costo, comportamiento y éxito
   para cada harness, **sin p-values** (corte N3 del challenge). Responde "¿el harness supera a una
@@ -796,10 +802,7 @@ pins:                      # specs/round-protocol/ R1
   harbor: "0.25.0"
   variants:
     navori: "0.12.3"
-    superpowers: "v7.0.1@2ce8aa15"
-    ponytail: "main@09c434ab"
-    gentle-ai: "v4.3.1"
-variants: [vanilla-default, navori, gentle-ai, superpowers, ponytail, placebo]
+variants: [vanilla-default, navori, placebo]   # revisión 5
 baseline: vanilla-default
 placebo: placebo
 tasks:                     # las 12 dev; el holdout entra solo con --holdout

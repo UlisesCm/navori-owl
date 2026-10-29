@@ -128,6 +128,17 @@ def test_tampered_is_a_failure_out_of_the_composite(tmp_path: Path) -> None:
     assert "tampered" in (lab.rdir / "report.md").read_text()
 
 
+# Covers: R27
+def test_primary_heading_counts_the_round_family(tmp_path: Path) -> None:
+    """The Holm family size follows the round's variants (revision 5: navori and placebo, m = 4)."""
+    lab = _one(tmp_path)
+
+    report = lab.report()
+
+    assert len(report["primary"]) == 4
+    assert "(un solo Holm, 4 l\u00edneas)" in (lab.rdir / "report.md").read_text()
+
+
 def test_limit_hit_is_counted_and_kept(tmp_path: Path) -> None:
     lab = _one(tmp_path, log="error_max_turns", reward={"reward": 0})
 
