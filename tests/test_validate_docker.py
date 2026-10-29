@@ -668,7 +668,7 @@ def test_gentle_ai_install_on_patient(patient_image: str, tmp_path: Path) -> Non
         _docker_exec(name, prepare, user="root")
         _docker_exec(name, f"{env}cd /app && {init}", user="node")
 
-        assert "gentle-ai 3.7.0" in _docker_exec(name, f"{gentle} version", user="node")
+        assert "gentle-ai 4.3.1" in _docker_exec(name, f"{gentle} version", user="node")
         assert '"context7"' in _docker_exec(name, "cat /app/.mcp.json", user="node")
         settings = _docker_exec(name, "cat /app/.claude/settings.json", user="node")
         assert "gentle-ai review stop-hook" in settings

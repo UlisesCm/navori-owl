@@ -1,13 +1,13 @@
-# gentle-ai v3.7.0 installed by its own binary, pinned by release and sha256, with the product defaults.
+# gentle-ai v4.3.1 installed by its own binary, pinned by release and sha256, with the product defaults.
 #
 # DISCLOSURE (RULES.md / report, D17):
-# - Route: release tarball from github.com/Gentleman-Programming/gentle-ai (v3.7.0), verified with a
-#   sha256 pinned in this file (taken from the release's checksums.txt, spike T11 §1) and extracted
+# - Route: release tarball from github.com/Gentleman-Programming/gentle-ai (v4.3.1), verified with a
+#   sha256 pinned in this file (taken from the release's checksums.txt, spike §"v4.3.1") and extracted
 #   to $HOME/.local/bin (Harbor puts it on PATH). The minisign signature is not verified (it would
 #   need `minisign` in the image).
 # - Command, from /app: `gentle-ai install --agent claude-code --preset full-gentleman --scope
-#   workspace`. No --persona / --sdd-mode: product defaults, i.e. persona `gentleman`, SDD mode
-#   `single` (store `openspec`), receipt-driven development `on` (spike T11 §10). The `gentleman`
+#   workspace`. No --persona: product defaults, i.e. persona `gentleman` and receipt-driven
+#   development `on` (spike §"v4.3.1"); v4 retired SDD/openspec in favor of ODD. The `gentleman`
 #   persona tells the agent to use bat/rg/fd/sd/eza, which the image does not have; it is measured
 #   as shipped.
 # - Telemetry: OFF. `GENTLE_AI_TELEMETRY=0` is exported in `init` (install-time telemetry) and set in
@@ -22,10 +22,9 @@
 #   Only the `permissions.deny` rules that gentle-ai writes to ~/.claude/settings.json are bridged
 #   (bridge B) into $OWL_CLAUDE_CONFIG_DIR/settings.json, because Harbor runs Claude Code with
 #   CLAUDE_CONFIG_DIR=/logs/agent/sessions and would not load ~/.claude*.
-# - engram: NOT pinned. The installer downloads engram from `releases/latest` (2.2.1 observed on
-#   2026-09-30) unless one is already in PATH; which engram version v3.7.0 expects, and whether
-#   2.1.0 supports `--protocol=slim`, was not established (spike §9). The version can therefore
-#   change between rounds; report the version seen in the trial.
+# - engram: NOT pinned. The installer downloads engram from `releases/latest` (3.6.0 observed at
+#   the r1 cutoff, 2026-10-28) unless one is already in PATH. The version can change between
+#   rounds; report the version seen in the trial.
 # - TO CONFIRM IN T21 (the spike had no real `claude`, only a stub): what `claude plugin install
 #   engram` and `claude mcp add --scope user engram` write, and whether that lands under
 #   CLAUDE_CONFIG_DIR (exported below to $OWL_CLAUDE_CONFIG_DIR). If it lands in ~/.claude* the
@@ -35,22 +34,22 @@
 # - TO CONFIRM IN T21: the real Harbor mount of /logs/agent (the spike emulated it), and the
 #   review stop-hook's effect on headless sessions (D3, "Riesgo declarado").
 id: gentle-ai
-description: gentle-ai v3.7.0 instalado desde su release pineado (claude-code, preset full-gentleman, scope workspace) con telemetría apagada.
+description: gentle-ai v4.3.1 instalado desde su release pineado (claude-code, preset full-gentleman, scope workspace) con telemetría apagada.
 agent: claude-code
 agent_version: "2.1.312"
 harness:
-  version: "v3.7.0"   # round-protocol R2
+  version: "v4.3.1"   # round-protocol R2
   upstream: github-release:Gentleman-Programming/gentle-ai
   init: |
     set -eu
-    GENTLE_AI_VERSION="3.7.0"
+    GENTLE_AI_VERSION="4.3.1"
     case "$(uname -m)" in
       x86_64)
         GENTLE_AI_ARCH=amd64
-        GENTLE_AI_SHA256="a730a61a43758f04cc9a4ac644945cc0e8652a1e33d6997a0a3d3f0044d2fff5" ;;
+        GENTLE_AI_SHA256="04ec685c56b42c29dff6db10fc7dc2c730217dc9c96736e53ad2acf3226dafb7" ;;
       aarch64|arm64)
         GENTLE_AI_ARCH=arm64
-        GENTLE_AI_SHA256="a3a3d3a974f3d9b67d935fe9e306ae83c305da4ec1baed4a5319c10b044cd0eb" ;;
+        GENTLE_AI_SHA256="99e7d313a2ff85eaf23a6415e9b3aae67bf74c2fa169b21b93070ada7613f6a0" ;;
       *) echo "gentle-ai: unsupported arch $(uname -m)" >&2; exit 1 ;;
     esac
     GENTLE_AI_TARBALL="gentle-ai_${GENTLE_AI_VERSION}_linux_${GENTLE_AI_ARCH}.tar.gz"
@@ -96,18 +95,15 @@ harness:
     grep -q 'opsdesk-conventions-sentinel-f96c2e' /app/AGENTS.md || { echo "gentle-ai: base AGENTS.md content missing after install" >&2; exit 1; }
   env:
     GENTLE_AI_TELEMETRY: "0"
-  # source: gentle-ai v3.7.0 internal/components/agentguidance/routing.go:49,97 and
-  # .claude/CLAUDE.md (persona/orchestrator contract) order `odd/tasks/<feature-name>.md` before
-  # the first write (docs/usage.md; spike T11 §12); nothing else under odd/ is written (T14).
-  # source: gentle-ai v3.7.0 SDD skills (.claude/skills/sdd-*/SKILL.md) write `openspec/config.yaml`,
-  # `openspec/changes/<change>/...` and `openspec/specs/...`; the default store is `openspec`
-  # (`gentle-ai sdd-status`, spike T11 §12). openspec/ is the narrowest prefix covering
-  # config.yaml, changes/ and specs/ (T14).
+  # source: gentle-ai v4.3.1 installed .claude/CLAUDE.md:487,547 and
+  # .claude/skills/_shared/persistence-contract.md:5 order `odd/tasks/<feature-name>.md` before
+  # the first source write; `odd/<feature-name>/tasks` is an Engram topic, not a path. v4 retired
+  # SDD: no installed asset mentions openspec/ (r1 cutoff audit).
   artifacts:
     - "odd/tasks/"
-    - "openspec/"
   # .atl/ is written by the harness itself (UserPromptSubmit hook `skill-registry refresh`), not
-  # agent output (spike T11 §4, §12).
+  # agent output (spike T11 §4, §12; same in v4.3.1, the only /app write of its session hooks).
+  # Review authority state lives under /app/.git/gentle-ai/, outside the scope snapshot.
   runtime_state:
     - ".atl/"
 # source: T21 smoke: the engram component of preset full-gentleman runs `claude plugin install`

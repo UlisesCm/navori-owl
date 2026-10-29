@@ -324,3 +324,29 @@ $ ls -la ~/.local/bin
 `docs/`, `.claude/` y la raíz no aparecen como destino del flujo por default. Nota de riesgo: las skills
 `sdd-*` mencionan `specs/…` en algunos pasajes (p. ej. `specs/{capability}/spec.md`); el store por default es
 `openspec`, así que no se declara.
+
+## v4.3.1 (r1-refresco T5, corte 2026-10-28)
+
+Mismo método que arriba: contenedor desechable de `owl-patient:local` sellado con `seal.sh`, usuario `node`,
+`/logs/agent` emulado con modo 777, sin modelo, con un stub de `claude` que registra sus argumentos y sale 0.
+arm64. El contenedor se borró al terminar.
+
+| Punto | Resultado |
+|---|---|
+| Binario | `gentle-ai_4.3.1_linux_{amd64,arm64}.tar.gz`, sha256 de `checksums.txt` (`04ec685c…`, `99e7d313…`), `sha256sum -c` OK; `gentle-ai version` → `4.3.1`. Firma minisign sin verificar (D3) |
+| Flags | `install --agent claude-code --preset full-gentleman --scope workspace` sigue válido; desapareció `--sdd-mode` (no se usaba). Flags nuevos sin uso aquí: `--channel`, `--claude-orchestrator-modules` (solo global), `GENTLE_AI_HOME`, `GENTLE_AI_ENGRAM_BIN` |
+| Preset | `full-gentleman`: `claude-theme,context7,persona,engram,gga,opencode-gentle-logo,permissions,skills`. **Ya no incluye `sdd`**: v4 retiró SDD/openspec y deja ODD; `gentle-ai sdd-status` ya no existe |
+| Instalación | `EXIT=0` en 5 s; "82 passed" de verificación. Mismo aviso engañoso de v3: dice que engram quedó en `~/go/bin`, pero quedó en `~/.local/bin` |
+| `/app` | `.claude/{CLAUDE.md,settings.json,agents/,skills/,mcp/engram.json,output-styles/gentleman.md}` y `.mcp.json` (solo `context7`, `@upstash/context7-mcp@2.2.5` por `npx`). `CLAUDE.md` y `AGENTS.md` del paciente intactos (centinela 1 vez en cada uno) |
+| Hooks (`/app/.claude/settings.json`) | `SessionStart` y `Stop`: `gentle-ai review stop-hook --agent claude-code`; `Stop` y `SubagentStop`: `gentle-ai telemetry runtime claude --json`; `UserPromptSubmit`: `gentle-ai skill-registry refresh --quiet --no-gitignore --cwd …`. Corridos a mano: solo el último escribe en `/app` (`.atl/skill-registry.md`, `.atl/.skill-registry.cache.json`); la telemetría responde `"decision": "disabled"` |
+| `$HOME` | `~/.claude/settings.json` (24 reglas `permissions.deny`, puente B), `~/.claude/themes`, `~/.config/gga`, `~/.engram/protocol-mode.json`, `~/.gentle-ai/{state.json,backups}`, `~/.local/bin/{gentle-ai,gga,engram}`, `~/.local/share/…` |
+| Llamadas a `claude` | `plugin marketplace add Gentleman-Programming/engram`, `plugin install engram`, `mcp add --transport stdio --scope user engram -- ~/.local/bin/engram mcp --tools=agent`, `mcp remove engram --scope user`, `plugin list --json`. En v3 el MCP de usuario quedaba; v4 lo quita tras instalar el plugin |
+| Telemetría | `telemetry: disabled (source: GENTLE_AI_TELEMETRY)` |
+| engram | `releases/latest` → `3.6.0`, no fijado |
+| Persona / RDD | `gentleman`; receipt-driven development `on (decided by default)`, sin override global ni de clon. `review start` pide consentimiento por candidato: en una sesión headless el agente no puede darlo; se mide tal cual |
+| Estado del review | bajo `/app/.git/gentle-ai/` (`internal/cli/review_narration.go:103` del tag); no crea refs propias (solo lee `refs/heads/`, `refs/tags/`). El snapshot de alcance poda `.git` y `fsck` ignora directorios ajenos |
+| Artefactos | `odd/tasks/` (`.claude/CLAUDE.md:487,547`, `_shared/persistence-contract.md:5`); `openspec/` sale; `.atl/` sigue en `runtime_state` |
+
+No comprobado (pide `claude` real): qué servidores y plugins reporta `system/init` tras `plugin install` +
+`mcp remove --scope user`, es decir, si engram aparece como MCP con otro nombre (servido por el plugin). Eso
+decide el `expect` del manifiesto.

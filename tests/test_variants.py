@@ -89,7 +89,7 @@ def test_placebo_command_appends_system_prompt() -> None:
 # Covers: R6, R9
 def test_gentle_ai_declares_artifacts() -> None:
     v = Variant.load("gentle-ai")
-    assert v.artifacts == ["odd/tasks/", "openspec/"]
+    assert v.artifacts == ["odd/tasks/"]
     # .atl/ is harness-written state, never an artifact (R9).
     assert v.runtime_state == [".atl/"]
     assert not set(v.artifacts) & set(v.runtime_state)

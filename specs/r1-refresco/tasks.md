@@ -27,7 +27,7 @@ Estimated LOC: 250
 
 ### M4 — gentle-ai v4.3.1
 - **A4** [observable] — gentle-ai v4.3.1 se instala sobre el paciente con los defaults del producto, la telemetría apagada y sus prefijos auditados · `uv run pytest tests/test_variants.py tests/test_validate_docker.py -q -k gentle_ai` → todas pasan
-- [ ] **T5** (R3, R4) — Spike gratis y sin modelo de gentle-ai v4.3.1 en `owl-patient:local` (flags de `install`, preset y flujo ODD por defecto, lo que escribe fuera de `/app`, telemetría, hooks, engram esperado), en `specs/f3-ronda1/spike-gentle-ai.md` §"v4.3.1", y auditoría de sus prefijos · effect: docs · test: tests/test_variants.py::test_gentle_ai_expect_matches_real_install
+- [x] **T5** (R3, R4) — Spike gratis y sin modelo de gentle-ai v4.3.1 en `owl-patient:local` (flags de `install`, preset y flujo ODD por defecto, lo que escribe fuera de `/app`, telemetría, hooks, engram esperado), en `specs/f3-ronda1/spike-gentle-ai.md` §"v4.3.1", y auditoría de sus prefijos · effect: docs · test: tests/test_variants.py::test_gentle_ai_expect_matches_real_install
 - [ ] **T6** (R2, R4) — `gentle-ai.yaml` a v4.3.1: binario y checksum del release, flags del spike, `GENTLE_AI_TELEMETRY=0` en instalación y run, `expect`, `artifacts`, `harness.version` y `harness.upstream` · effect: behavior · test: tests/test_validate_docker.py::test_gentle_ai_install_on_patient
 
 ### M5 — Haiku 5.5 y piloto
