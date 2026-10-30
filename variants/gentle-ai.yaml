@@ -7,15 +7,15 @@
 #   need `minisign` in the image).
 # - Command, from /app: `gentle-ai install --agent claude-code --preset full-gentleman --scope
 #   workspace`. No --persona: product defaults, i.e. persona `gentleman` and receipt-driven
-#   development `on` (spike §"v4.3.1"); v4 retired SDD/openspec in favor of ODD. The `gentleman`
-#   persona tells the agent to use bat/rg/fd/sd/eza, which the image does not have; it is measured
-#   as shipped.
+#   development `on` (spike §"v4.3.1"); v4 retired SDD/openspec in favor of ODD. Unlike v3, the v4
+#   `gentleman` persona no longer demands bat/rg/fd/sd/eza (it prefers the agent's native tools).
 # - Telemetry: OFF. `GENTLE_AI_TELEMETRY=0` is exported in `init` (install-time telemetry) and set in
 #   `harness.env` (the Stop/SubagentStop hooks would otherwise report model and tokens each session).
 #   Evidence: the spike saw status `disabled (source: GENTLE_AI_TELEMETRY)` and hooks answering
 #   "disabled"; the T21 smoke (specs/f3-ronda1/smoke.md) only shows GENTLE_AI_TELEMETRY=0 in the
 #   agent env and the telemetry Stop hook running with no output or errors. That nothing is reported
-#   is inferred from the env var, not observed on the wire.
+#   is inferred from the env var in the trial; in the v4.3.1 spike a local listener standing in for
+#   the telemetry host saw connections without the variable and none with GENTLE_AI_TELEMETRY=0.
 # - Where it writes (spike T11 §4-§5): the project side (/app/.claude/**, /app/.mcp.json with context7)
 #   stays as installed. State and tools in $HOME (~/.gentle-ai, ~/.config/gga, ~/.local/share/gga,
 #   ~/.engram, ~/.local/bin/{gga,engram}) stay in $HOME. Themes (~/.claude/themes) are not bridged.
@@ -25,14 +25,14 @@
 # - engram: NOT pinned. The installer downloads engram from `releases/latest` (3.6.0 observed at
 #   the r1 cutoff, 2026-10-28) unless one is already in PATH. The version can change between
 #   rounds; report the version seen in the trial.
-# - TO CONFIRM IN T21 (the spike had no real `claude`, only a stub): what `claude plugin install
-#   engram` and `claude mcp add --scope user engram` write, and whether that lands under
-#   CLAUDE_CONFIG_DIR (exported below to $OWL_CLAUDE_CONFIG_DIR). If it lands in ~/.claude* the
-#   bridge must also cover ~/.claude.json mcpServers and ~/.claude/plugins/. The `expect` block below
-#   is likewise provisional: .mcp.json only declares context7; whether engram appears as a loaded
-#   MCP server or plugin in `system/init` is confirmed in T21.
-# - TO CONFIRM IN T21: the real Harbor mount of /logs/agent (the spike emulated it), and the
-#   review stop-hook's effect on headless sessions (D3, "Riesgo declarado").
+# - engram plugin and user MCP (spike §"v4.3.1", real Claude Code 2.1.312, no model): `claude plugin
+#   install engram` and `claude mcp add --scope user engram` land under CLAUDE_CONFIG_DIR (exported
+#   below to $OWL_CLAUDE_CONFIG_DIR): plugins/, settings.json (enabledPlugins) and .claude.json
+#   (mcpServers.engram). No bridge is needed for them. The plugin comes from the engram marketplace's
+#   default branch (0.1.19 at commit a6f66c2e on the cutoff), NOT pinned; report the version seen.
+# - TO CONFIRM IN the r1 conformity smoke: the v4 review stop-hook and receipt-driven development on
+#   headless sessions (D3, "Riesgo declarado"); `review start` asks per-candidate consent, which a
+#   headless session cannot give, and is measured as shipped.
 id: gentle-ai
 description: gentle-ai v4.3.1 instalado desde su release pineado (claude-code, preset full-gentleman, scope workspace) con telemetría apagada.
 agent: claude-code
@@ -106,8 +106,8 @@ harness:
   # Review authority state lives under /app/.git/gentle-ai/, outside the scope snapshot.
   runtime_state:
     - ".atl/"
-# source: T21 smoke: the engram component of preset full-gentleman runs `claude plugin install`
-# (plugin engram) and `claude mcp add --scope user` (server engram); .mcp.json adds context7.
+# source: T21 smoke (v3.7.0) and spike §"v4.3.1" with real `claude`: `claude plugin list` shows
+# engram@engram enabled and `claude mcp list` shows engram (user) connected and context7 (.mcp.json).
 expect:
   plugins: [engram]
   mcp_servers: [context7, engram]

@@ -86,7 +86,7 @@ def test_placebo_command_appends_system_prompt() -> None:
     assert "append_system_prompt=Keep changes minimal and verify your work." in aks
 
 
-# Covers: R6, R9
+# Covers: R6, R9; R3, R4 (r1-refresco)
 def test_gentle_ai_declares_artifacts() -> None:
     v = Variant.load("gentle-ai")
     assert v.artifacts == ["odd/tasks/"]
@@ -95,7 +95,7 @@ def test_gentle_ai_declares_artifacts() -> None:
     assert not set(v.artifacts) & set(v.runtime_state)
 
 
-# Covers: R6, R9
+# Covers: R6, R9; R3, R4 (r1-refresco)
 def test_gentle_ai_telemetry_off_in_install_and_run() -> None:
     v = Variant.load("gentle-ai")
     assert v.env == {"GENTLE_AI_TELEMETRY": "0"}
@@ -109,7 +109,7 @@ def test_gentle_ai_telemetry_off_in_install_and_run() -> None:
     assert 'export CLAUDE_CONFIG_DIR="$OWL_CLAUDE_CONFIG_DIR"' in lines
 
 
-# Covers: R6
+# Covers: R6; R3, R4 (r1-refresco)
 def test_gentle_ai_expect_matches_real_install() -> None:
     v = Variant.load("gentle-ai")
     assert v.expect == {"plugins": ["engram"], "mcp_servers": ["context7", "engram"]}

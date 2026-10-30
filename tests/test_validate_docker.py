@@ -646,7 +646,7 @@ def test_navori_install_on_patient(patient_image: str, tmp_path: Path) -> None:
         _teardown_container(name, tag)
 
 
-# Covers: R6, R9
+# Covers: R6, R9; R2, R4 (r1-refresco)
 def test_gentle_ai_install_on_patient(patient_image: str, tmp_path: Path) -> None:
     """variants/gentle-ai.yaml#harness.init (D3), run as ClaudeCodeHarness.install executes it
     (`cd /app && <init>`, user `node`, OWL_CLAUDE_CONFIG_DIR under a Harbor-like /logs/agent), on
