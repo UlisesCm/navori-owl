@@ -1,3 +1,21 @@
+## 2026-10-30 09:10 Pi — r1-refresco E2 M4: gentle-ai v4.3.1 confirmado con claude real
+
+## Goal
+Cerrar r1-refresco E2 M4 (spike y manifiesto de gentle-ai v4.3.1).
+## Discoveries
+- Una sesión previa dejó a2042db sin push en feat/r1-refresco-e2 (spike con stub, expect pendiente).
+- Con Claude Code 2.1.312 real sin modelo: plugin engram@engram 0.1.19 y MCP de usuario engram quedan en CLAUDE_CONFIG_DIR; expect [engram] / [context7, engram] se mantiene. El stub hacía parecer que v4 quitaba el MCP.
+- Telemetría: listener local ve conexiones sin la variable y 0 con GENTLE_AI_TELEMETRY=0. engram 3.6.0 (releases/latest); plugin de la rama por defecto del marketplace, sin fijar.
+- v4 retiró SDD/openspec: artifacts solo odd/tasks/; .atl/ runtime_state; autoridad de RDD en .git/gentle-ai/ (fuera del snapshot).
+- Subagentes navori siguen sin salida en Pi: spike, auditoría y revisión inline, sin contexto fresco.
+## Accomplished
+- variants/gentle-ai.yaml v4.3.1 (checksums, comentarios de divulgación), spike §"v4.3.1" con comprobación real, artifacts-audit, trazabilidad R2-R4 de r1-refresco en tests; T5 y T6 marcadas.
+- Gate: ruff check . verde; uv run pytest -q (docker incluido) 396 passed; A4 4 passed.
+## Next Steps
+- M5: T7 precios oficiales de Haiku 5.5 y DEFAULT_MODELS; T8 piloto de 24 trials (gasta modelo, requiere OK). PR de E2 al cerrar M5.
+## Relevant Files
+- variants/gentle-ai.yaml, specs/f3-ronda1/spike-gentle-ai.md, specs/f3-ronda1/artifacts-audit.md, specs/r1-refresco/tasks.md, tests/test_variants.py, tests/test_validate_docker.py.
+
 ## 2026-10-28 18:20 Pi — r1-refresco E1: plataforma al corte (Harbor, Claude Code, harnesses, prefijos)
 
 ## Goal
