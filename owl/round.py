@@ -37,7 +37,7 @@ class Round:
     baseline: str
     placebo: str
     tasks: list[str]
-    prices_usd_per_mtok: dict[str, float]
+    prices_usd_per_mtok: dict[str, Any]
     artifacts: list[str] = field(default_factory=list)
     raw: dict[str, Any] = field(default_factory=dict)
     limits: dict[str, Any] = field(default_factory=dict)
@@ -64,10 +64,7 @@ class Round:
         missing_tasks = [t for t in tasks if not (root / t).is_dir()]
         if missing_tasks:
             raise SystemExit(f"{path}: unknown task(s): {', '.join(missing_tasks)}")
-        prices = data.get("prices_usd_per_mtok") or {}
-        missing_prices = [k for k in PRICE_KEYS if k not in prices]
-        if missing_prices:
-            raise SystemExit(f"{path}: prices_usd_per_mtok is missing: {', '.join(missing_prices)}")
+        prices = _validate_prices(path, data.get("prices_usd_per_mtok") or {})
         for key, value in (
             ("concurrency", data.get("concurrency", 2)),
             ("stop.consecutive_infra", (data.get("stop") or {}).get("consecutive_infra", 3)),
@@ -99,7 +96,7 @@ class Round:
             baseline=str(data["baseline"]),
             placebo=str(data["placebo"]),
             tasks=tasks,
-            prices_usd_per_mtok={k: float(v) for k, v in prices.items()},
+            prices_usd_per_mtok=prices,
             artifacts=artifacts,
             raw=data,
             limits=limits,
@@ -145,6 +142,29 @@ def _validate_pins(path: Path, data: dict[str, Any], variants: list[Variant]) ->
     if problems:
         raise SystemExit(f"{path}: pins do not match:\n" + "\n".join(f"  - {p}" for p in problems))
     return cutoff_date, {"harbor": str(pins["harbor"]), "variants": variant_pins}
+
+
+def _validate_prices(path: Path, prices: dict[str, Any]) -> dict[str, Any]:
+    """The five PRICE_KEYS as floats plus an optional ``long_context`` tier: the five keys again and
+    ``above_prompt_tokens``, for models billed by prompt length (Haiku 5.5, r1-refresco R5/R7)."""
+
+    def five(where: str, mapping: dict[str, Any]) -> dict[str, float]:
+        missing = [k for k in PRICE_KEYS if k not in mapping]
+        if missing:
+            raise SystemExit(f"{path}: {where} is missing: {', '.join(missing)}")
+        return {k: float(mapping[k]) for k in PRICE_KEYS}
+
+    out: dict[str, Any] = five("prices_usd_per_mtok", prices)
+    tier = prices.get("long_context")
+    if tier is not None:
+        where = "prices_usd_per_mtok.long_context"
+        if not isinstance(tier, dict):
+            raise SystemExit(f"{path}: {where} must be a mapping")
+        above = tier.get("above_prompt_tokens")
+        if isinstance(above, bool) or not isinstance(above, int) or above < 1:
+            raise SystemExit(f"{path}: {where}.above_prompt_tokens must be an integer >= 1")
+        out["long_context"] = {**five(where, tier), "above_prompt_tokens": above}
+    return out
 
 
 def load_limits(path: Path | str) -> dict[str, Any]:

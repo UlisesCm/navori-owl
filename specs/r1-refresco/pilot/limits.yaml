@@ -1,0 +1,7 @@
+# Pilot T8 (r1-refresco R6): the limits of round 1, F3 design D7. T23 copies them into rounds/r1/round.yaml.
+# No cpus/memory_mb: the pilot measures with Harbor's task defaults; T23 decides whether the round fixes them.
+limits:
+  agent_timeout_multiplier: 3.0
+  agent_setup_timeout_multiplier: 2.0
+  max_turns: 300
+  max_budget_usd: "5.00"

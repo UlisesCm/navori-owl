@@ -387,6 +387,52 @@ def test_owl_estimate_splits_cache_write_5m_1h(tmp_path: Path) -> None:
     assert estimate_cost_from_sessions(trial, PRICES) == pytest.approx(625 / 1_000_000)
 
 
+HAIKU_5_5 = {
+    "input": 0.10, "output": 0.50, "cache_read": 0.01, "cache_write_5m": 0.125, "cache_write_1h": 0.20,
+    "long_context": {"above_prompt_tokens": 100_000, "input": 0.50, "output": 2.50, "cache_read": 0.05,
+                     "cache_write_5m": 0.625, "cache_write_1h": 1.00},
+}
+
+
+@pytest.mark.parametrize(
+    ("usage", "expected"),
+    [
+        # Prompt exactly at the threshold: base prices ("over 100,000 tokens" pays the higher ones).
+        ({"input_tokens": 1_000, "cache_read_input_tokens": 99_000, "output_tokens": 100},
+         1_000 * 0.10 + 99_000 * 0.01 + 100 * 0.50),
+        # One token over, counting cache reads: the whole request at the long-context tier.
+        ({"input_tokens": 1_001, "cache_read_input_tokens": 99_000, "output_tokens": 100},
+         1_001 * 0.50 + 99_000 * 0.05 + 100 * 2.50),
+        # Cache writes count toward the prompt and take the tier's 5m/1h prices.
+        ({"input_tokens": 10, "cache_read_input_tokens": 50_000, "output_tokens": 1,
+          "cache_creation_input_tokens": 60_000,
+          "cache_creation": {"ephemeral_5m_input_tokens": 20_000, "ephemeral_1h_input_tokens": 40_000}},
+         10 * 0.50 + 50_000 * 0.05 + 1 * 2.50 + 20_000 * 0.625 + 40_000 * 1.00),
+        # Unsplit cache write: priced at the 5 min rate and still counted.
+        ({"input_tokens": 10, "cache_creation_input_tokens": 100_000}, 10 * 0.50 + 100_000 * 0.625),
+    ],
+)
+def test_owl_estimate_prices_long_context_per_request(tmp_path: Path, usage: dict, expected: float) -> None:
+    """Covers: R7 (r1-refresco: Haiku 5.5 bills each request by its prompt length)"""
+    trial = _trial(tmp_path, [INIT, _result()])
+    _write_session(trial, [_assistant("m1", usage)])
+    assert estimate_cost_from_sessions(trial, HAIKU_5_5) == pytest.approx(expected / 1_000_000)
+
+
+def test_owl_estimate_tiers_each_request_independently(tmp_path: Path) -> None:
+    """Covers: R7 (r1-refresco: earlier requests keep the price they were billed at)"""
+    trial = _trial(tmp_path, [INIT, _result()])
+    _write_session(trial, [
+        _assistant("m1", {"input_tokens": 50_000, "output_tokens": 10}),
+        _assistant("m2", {"input_tokens": 150_000, "output_tokens": 10}),
+    ])
+    expected = (50_000 * 0.10 + 10 * 0.50) + (150_000 * 0.50 + 10 * 2.50)
+    assert estimate_cost_from_sessions(trial, HAIKU_5_5) == pytest.approx(expected / 1_000_000)
+    # Without the tier the flat five prices apply to every request, as before.
+    flat = {k: v for k, v in HAIKU_5_5.items() if k != "long_context"}
+    assert estimate_cost_from_sessions(trial, flat) == pytest.approx((200_000 * 0.10 + 20 * 0.50) / 1_000_000)
+
+
 def test_owl_estimate_includes_subagent_files(tmp_path: Path) -> None:
     """Covers: R25"""
     trial = _trial(tmp_path, [INIT, _result()])

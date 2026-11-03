@@ -1,3 +1,33 @@
+## 2026-11-03 16:30 Pi — r1-refresco T8: piloto de 24 trials con Haiku 5.5
+
+## Goal
+Cerrar r1-refresco E2 con el piloto (R6, R7), aprobado por el usuario.
+## Discoveries
+- #36 se mergeó en 69542ce, antes de los commits de T9: van en el PR #37 (`feat/r1-refresco-t9`).
+- Piloto: 24/24 gate ok sin infra, contaminación ni límites; el estimador reproduce total_cost_usd con error máximo 5e-16; costo total $0.197. Ningún request pasó de 100k tokens de prompt (máx. 67 930): el tramo alto sigue sin validarse contra Claude Code.
+- Tareas: 10 en 2/2, 16 (security 0) y 19 (contradictory_intact 0) en 0/2, ninguna en 1/2: línea base en el techo, que pesa en la sensibilidad de RULES.md.
+## Accomplished
+- Borradores `specs/r1-refresco/pilot/{preamble.md,limits.yaml}` (D5 y D7 de F3); resultados y tabla por tarea en cost-validation §"Revisión 4"; T8 marcada.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 355 passed (sin cambios de código desde T9).
+## Next Steps
+- Mergear #37; T38 smoke con Haiku 5.5 (gasta modelo) → T22 → T23.
+## Relevant Files
+- specs/f3-ronda1/cost-validation.md, specs/r1-refresco/pilot/, specs/r1-refresco/tasks.md.
+
+## 2026-11-03 15:40 Pi — r1-refresco T9: tramo de prompt largo de Haiku 5.5 en el estimador
+
+## Goal
+Que el estimador reproduzca el cobro por longitud de prompt de Haiku 5.5 antes del piloto (R7).
+## Discoveries
+- El tramo se decide por request: input + cache read + cache write > 100 000 tokens cobra todo el request al precio alto.
+## Accomplished
+- `prices_usd_per_mtok.long_context` opcional (cinco precios y `above_prompt_tokens`) validado en owl/round.py; `estimate_cost_from_sessions` elige el tramo por message.id. R5 y D3 enmendados, T9 en tasks.md, cost-validation con el YAML que copia T23. PR #36 abierto por pedido del usuario.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 355 passed, exit 0. Ciclo inline, sin reviewer.
+## Next Steps
+- Mergear #36; T8 piloto (gasta modelo, pedir OK) valida el tramo contra total_cost_usd.
+## Relevant Files
+- owl/gate.py, owl/round.py, tests/test_gate.py, tests/test_round.py, specs/r1-refresco/{requirements,design,tasks}.md, specs/f3-ronda1/cost-validation.md.
+
 ## 2026-11-03 15:20 Pi — r1-refresco: deuda de tests de T7/T29 saldada y precios de Haiku 5.5
 
 ## Goal

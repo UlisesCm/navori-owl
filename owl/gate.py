@@ -353,13 +353,16 @@ def _overlay_cost_from_result_json(gate: TrialGate, trial_dir: Path) -> None:
         gate.cost_source = "harbor"
 
 
-def estimate_cost_from_sessions(trial_dir: Path, prices: dict[str, float]) -> float | None:
+def estimate_cost_from_sessions(trial_dir: Path, prices: dict) -> float | None:
     """Owl's cost estimate from the session transcripts (R25); None when there are no usable records.
 
     Reads every ``agent/sessions/projects/**/*.jsonl`` (main and subagent files), groups
     ``assistant`` records by ``message.id`` and prices the ``usage`` of the last record of each id.
     Cache writes are priced at the 5 min and 1 h rates separately. Prices are USD per MTok.
+    With a ``long_context`` tier, a request whose prompt (input + cache read + cache write tokens)
+    exceeds ``above_prompt_tokens`` is priced entirely at that tier, as Anthropic bills Haiku 5.5.
     """
+    tier = prices.get("long_context")
     last_usage: dict[str, dict] = {}
     for path in sorted((trial_dir / "agent" / "sessions" / "projects").rglob("*.jsonl")):
         for line in path.read_text(errors="replace").splitlines():
@@ -382,12 +385,16 @@ def estimate_cost_from_sessions(trial_dir: Path, prices: dict[str, float]) -> fl
         if w5 is None and w1 is None:
             # No 5m/1h split: the whole write is priced at the 5 min rate.
             w5, w1 = usage.get("cache_creation_input_tokens") or 0, 0
+        w5, w1 = w5 or 0, w1 or 0
+        tokens_in = usage.get("input_tokens") or 0
+        tokens_read = usage.get("cache_read_input_tokens") or 0
+        rate = tier if tier and tokens_in + tokens_read + w5 + w1 > tier["above_prompt_tokens"] else prices
         total += (
-            (usage.get("input_tokens") or 0) * prices["input"]
-            + (usage.get("output_tokens") or 0) * prices["output"]
-            + (usage.get("cache_read_input_tokens") or 0) * prices["cache_read"]
-            + (w5 or 0) * prices["cache_write_5m"]
-            + (w1 or 0) * prices["cache_write_1h"]
+            tokens_in * rate["input"]
+            + (usage.get("output_tokens") or 0) * rate["output"]
+            + tokens_read * rate["cache_read"]
+            + w5 * rate["cache_write_5m"]
+            + w1 * rate["cache_write_1h"]
         )
     return total / 1_000_000
 
