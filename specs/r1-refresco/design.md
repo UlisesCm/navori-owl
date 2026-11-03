@@ -58,7 +58,11 @@ Dos entregas, porque tienen riesgos y costos distintos:
   prefijos, con un spike si la auditoría encuentra rutas nuevas fuera de `/app`.
 - **D3 — Modelo.** `anthropic/claude-haiku-5-5`: $0.10/$0.50 por MTok de entrada/salida según el
   changelog de Claude Code 2.1.293. Los tres precios de cache no están en ese changelog: se toman de la
-  tabla oficial de Anthropic con fecha, y el piloto los valida (R7).
+  tabla oficial de Anthropic con fecha, y el piloto los valida (R7). Haiku 5.5 se cobra por longitud de
+  prompt: un request con más de 100 000 tokens de prompt (input + cache read + cache write) paga los cinco
+  precios de un tramo alto. `prices_usd_per_mtok` admite un `long_context` opcional con esos cinco precios y
+  `above_prompt_tokens`, y el estimador elige el tramo por request (T9). Alternativa descartada: mantener
+  cinco precios planos y esperar a que el piloto falle R7.
 - **D4 — Piloto (R6, R7).** 24 trials: `vanilla-default` × 12 tareas dev × 2, con el modelo, los pins, el
   preámbulo y los límites de la ronda, en `jobs/pilot-r1`. Sirve para validar el estimador de costo,
   recalcular la sensibilidad esperada que declara `RULES.md` y detectar tareas que queden en 0/2 o 2/2
