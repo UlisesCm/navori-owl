@@ -31,7 +31,7 @@ AGENT_IMPORT_PATHS = {
     "codex": "codex",
 }
 DEFAULT_MODELS = {
-    "claude-code": "anthropic/claude-haiku-4-5-20251001",
+    "claude-code": "anthropic/claude-haiku-5-5",
     "codex": "openai/gpt-6-luna",
 }
 ENV_FILE = ROOT / ".env"
