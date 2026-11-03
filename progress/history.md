@@ -1,3 +1,17 @@
+## 2026-11-03 15:40 Pi — r1-refresco T9: tramo de prompt largo de Haiku 5.5 en el estimador
+
+## Goal
+Que el estimador reproduzca el cobro por longitud de prompt de Haiku 5.5 antes del piloto (R7).
+## Discoveries
+- El tramo se decide por request: input + cache read + cache write > 100 000 tokens cobra todo el request al precio alto.
+## Accomplished
+- `prices_usd_per_mtok.long_context` opcional (cinco precios y `above_prompt_tokens`) validado en owl/round.py; `estimate_cost_from_sessions` elige el tramo por message.id. R5 y D3 enmendados, T9 en tasks.md, cost-validation con el YAML que copia T23. PR #36 abierto por pedido del usuario.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 355 passed, exit 0. Ciclo inline, sin reviewer.
+## Next Steps
+- Mergear #36; T8 piloto (gasta modelo, pedir OK) valida el tramo contra total_cost_usd.
+## Relevant Files
+- owl/gate.py, owl/round.py, tests/test_gate.py, tests/test_round.py, specs/r1-refresco/{requirements,design,tasks}.md, specs/f3-ronda1/cost-validation.md.
+
 ## 2026-11-03 15:20 Pi — r1-refresco: deuda de tests de T7/T29 saldada y precios de Haiku 5.5
 
 ## Goal
