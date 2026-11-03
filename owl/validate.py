@@ -213,6 +213,60 @@ def _check_artifacts_clear(task_dir: Path) -> tuple[bool, str]:
     return True, "no environment/ file lies under or names an artifact prefix"
 
 
+_NET_SCAN_DIRS = ("tests", "solution", "cheat")
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "[::1]"}
+_URL_RE = re.compile(r"\bhttps?://(\[[^\]]*\]|[^/\s:'\"`$]+)")
+# Installer invocation -> what a pinned package argument looks like.
+_INSTALL_RES: list[tuple[re.Pattern[str], re.Pattern[str]]] = [
+    (re.compile(r"\b(?:npm\s+(?:install|i|add)|pnpm\s+add|yarn\s+add)\b(.*)"), re.compile(r"^(?:@[^/]+/)?[^@]+@\d")),
+    (re.compile(r"\bnpx\b(.*)"), re.compile(r"^(?:@[^/]+/)?[^@]+@\d")),
+    (re.compile(r"\bpip3?\s+install\b(.*)"), re.compile(r"==\d")),
+    (re.compile(r"\bapt-get\s+install\b(.*)"), re.compile(r"=\d")),
+    (re.compile(r"\bapk\s+add\b(.*)"), re.compile(r"=\d")),
+]
+
+
+def _unpinned_args(rest: str, pinned: re.Pattern[str], first_only: bool) -> list[str]:
+    """Package arguments of one installer call (up to a shell separator) that carry no version."""
+    args = [a.strip("'\"") for a in re.split(r"[;&|)]", rest, maxsplit=1)[0].split()]
+    args = [a for a in args if a and not a.startswith("-")]
+    if first_only:
+        args = args[:1]
+    return [a for a in args if not pinned.search(a)]
+
+
+def _check_net_pinning(task_dir: Path) -> tuple[bool, str]:
+    """F3 T29 G: tests/, solution/ and cheat/ fetch nothing from the network and install nothing
+    unpinned, so a task's verdict cannot drift with an upstream release. Comment lines are skipped;
+    loopback URLs are allowed (servers the tests start themselves)."""
+    problems: list[str] = []
+    for sub in _NET_SCAN_DIRS:
+        base = task_dir / sub
+        if not base.is_dir():
+            continue
+        for path in sorted(p for p in base.rglob("*") if p.is_file()):
+            raw = path.read_bytes()
+            if b"\x00" in raw:
+                continue
+            rel = path.relative_to(task_dir).as_posix()
+            for lineno, line in enumerate(raw.decode(errors="replace").splitlines(), 1):
+                code = line.strip()
+                if not code or code.startswith(("#", "//", "*", "/*")):
+                    continue
+                for host in _URL_RE.findall(code):
+                    if host.lower() not in _LOCAL_HOSTS:
+                        problems.append(f"{rel}:{lineno} network fetch from {host}")
+                for installer, pinned in _INSTALL_RES:
+                    match = installer.search(code)
+                    if match:
+                        first_only = installer.pattern.startswith(r"\bnpx")
+                        for arg in _unpinned_args(match.group(1), pinned, first_only):
+                            problems.append(f"{rel}:{lineno} unpinned install {arg}")
+    if problems:
+        return False, "; ".join(problems)
+    return True, "tests/, solution/ and cheat/ fetch nothing remote and install only pinned packages"
+
+
 def static_checks(task_dir: Path) -> dict[str, tuple[bool, str]]:
     """Run every static check (D9 §1) on one task directory. Returns check name -> (ok, reason)."""
     try:
@@ -229,6 +283,7 @@ def static_checks(task_dir: Path) -> dict[str, tuple[bool, str]]:
         "category": _check_category(info),
         "holdout_coherence": _check_holdout_coherence(task_dir),
         "artifacts_clear": _check_artifacts_clear(task_dir),
+        "net_pinning": _check_net_pinning(task_dir),
     }
     return checks
 
