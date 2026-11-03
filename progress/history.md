@@ -1,3 +1,20 @@
+## 2026-11-03 19:30 Pi — f3-ronda1 T38: smoke al corte con Haiku 5.5
+
+## Goal
+Repetir el smoke de T21 con Haiku 5.5 y los pins del corte (aprobado por el usuario, cuota del plan).
+## Discoveries
+- Claude Code 2.1.312 deja `usage` en cero cuando `error_max_budget_usd` corta el primer turno y reporta los tokens solo en `modelUsage`: el gate lo marcaba infra. Corregido.
+- Haiku 5.5 es tan barato y rápido que los forzados de T21 no se disparan: tope $0.0005 y timeout ×0.005 (3 s).
+- 6 variantes ok a concurrencia 2, huecos ≤ 3.9 s, solo `allowed`; gentle-ai con output_style Gentleman y 46 herramientas; review stop-hook sin bloquear.
+- `test_launch_exception_drains_and_exits_nonzero` falló una vez por timing (preexistente; aislado 6/6).
+## Accomplished
+- fix(gate) modelUsage + 2 tests (RED sin el fix); `smoke.md` §"Revisión 4"; T38 marcada. $0.055 equivalente API.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 358 passed, exit 0.
+## Next Steps
+- Mergear el PR; T22 (cp de lib.sh al holdout sin leer, owl validate --suite --holdout) → T23.
+## Relevant Files
+- owl/gate.py, tests/test_gate.py, specs/f3-ronda1/smoke.md, specs/f3-ronda1/tasks.md.
+
 ## 2026-11-03 16:30 Pi — r1-refresco T8: piloto de 24 trials con Haiku 5.5
 
 ## Goal
