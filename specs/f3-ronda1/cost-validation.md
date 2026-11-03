@@ -54,3 +54,29 @@ PY
 | 20-behavior-cleanup-tmp__vanilla-default__r2 | 0.0150205 | 0.0150205 | 0.00e+00 |
 | 21-overeng-csv-export__vanilla-default__r1 | 0.1907915 | 0.1907915 | 0.00e+00 |
 | 21-overeng-csv-export__vanilla-default__r2 | 0.2196530 | 0.2196530 | 1.26e-16 |
+
+## Revisión 4 (r1-refresco T7-T8, R5-R7)
+
+### Precios de Haiku 5.5 (T7, R5)
+
+Fuente: precios oficiales de Anthropic, `https://platform.claude.com/docs/en/about-claude/pricing`
+(§"Model pricing" y §"Long context pricing"), leídos el 2026-11-03. USD/MTok, ruteo global (default, sin
+`inference_geo`):
+
+| Clave de `prices_usd_per_mtok` | Prompt ≤ 100 000 tokens | Prompt > 100 000 tokens |
+|---|---|---|
+| `input` | 0.10 | 0.50 |
+| `output` | 0.50 | 2.50 |
+| `cache_read` | 0.01 | 0.05 |
+| `cache_write_5m` | 0.125 | 0.625 |
+| `cache_write_1h` | 0.20 | 1.00 |
+
+`DEFAULT_MODELS["claude-code"]` = `anthropic/claude-haiku-5-5` (`owl/cli.py`).
+
+**Riesgo para R7, abierto:** Haiku 5.5 es el único modelo de la tabla con precio por longitud de prompt. Cada
+request se cobra por separado, y el tramo alto aplica cuando `input + cache_read + cache_write` del request
+pasa de 100 000 tokens, aunque parte del prompt sea un cache hit. Hoy `estimate_cost_from_sessions` aplica un
+solo juego de cinco precios. Si un trial del piloto tiene algún request por encima del umbral, ese trial
+queda fuera de tolerancia con estos cinco precios. El estimador ya calcula por `message.id`, así que
+corregirlo por request se puede. Si hay que hacerlo, se decide con evidencia del piloto (R7), y no se relaja
+la tolerancia. Mientras tanto, T23 copia a `round.yaml` la columna ≤ 100 000.

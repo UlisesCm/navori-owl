@@ -32,5 +32,5 @@ Estimated LOC: 250
 
 ### M5 — Haiku 5.5 y piloto
 - **A5** [observable] — Los 24 trials del piloto pasan el gate y el estimador reproduce `total_cost_usd` al 0.1% en cada uno · `uv run owl gate jobs/pilot-r1` → 24 trials sin `infra` ni `contamination`; tabla de `specs/f3-ronda1/cost-validation.md` §"Revisión 4" sin filas fuera de tolerancia
-- [ ] **T7** (R5) — Precios oficiales de Haiku 5.5 (las cinco claves de `prices_usd_per_mtok`, con fuente y fecha) en `specs/f3-ronda1/cost-validation.md`; `DEFAULT_MODELS["claude-code"]` a `anthropic/claude-haiku-5-5` · effect: behavior · test: tests/test_cli_round.py::test_default_claude_model_is_haiku_5_5
+- [x] **T7** (R5) — Precios oficiales de Haiku 5.5 (las cinco claves de `prices_usd_per_mtok`, con fuente y fecha) en `specs/f3-ronda1/cost-validation.md`; `DEFAULT_MODELS["claude-code"]` a `anthropic/claude-haiku-5-5` · effect: behavior · test: tests/test_cli_round.py::test_default_claude_model_is_haiku_5_5
 - [ ] **T8** (R6, R7) — Piloto: 24 trials (`vanilla-default` × 12 tareas dev × 2) con modelo, pins, preámbulo y límites de la ronda en `jobs/pilot-r1`; validación del estimador y tabla por tarea (éxito, costo, comportamiento) en `specs/f3-ronda1/cost-validation.md` §"Revisión 4" · effect: docs · test: tests/test_gate.py::test_owl_estimate_splits_cache_write_5m_1h
