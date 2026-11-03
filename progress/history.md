@@ -1,3 +1,19 @@
+## 2026-11-03 15:20 Pi — r1-refresco: deuda de tests de T7/T29 saldada y precios de Haiku 5.5
+
+## Goal
+Saldar la deuda antes del PR de E2: fixtures con lock.json, doc de autoría, tests nuevos y precios de Haiku 5.5.
+## Discoveries
+- Arrancando en main se volvió a rehacer el spike de M4 (progress de main no ve la rama sin mergear); no se escribió nada. Datos nuevos: engram releases/latest ya es 3.6.1 (gentle-ai no lo fija) y el plugin sigue en 0.1.21.
+- Haiku 5.5 cobra por longitud de prompt: ≤100k tokens input 0.10, output 0.50, cache read 0.01, write 5m 0.125, write 1h 0.20; >100k 0.50/2.50/0.05/0.625/1.00 (platform.claude.com pricing, 2026-11-03). El estimador usa un solo juego de precios: riesgo para R7 en el piloto.
+## Accomplished
+- lock.json en FakeHarbor (test_round) y en _round_trial (test_gate); tests: test_conformity_reads_lock_multipliers, recursos cpus/memory_mb, condiciones efectivas, limits opcionales y load_limits, net_pinning (+/− y suite dev), test_default_claude_model_is_haiku_5_5, flags de recursos y del piloto, HARBOR_TELEMETRY=0 en cli y validate, cmd_run --preamble/--limits.
+- docs/task-authoring.md documenta net_pinning; cost-validation.md §"Revisión 4" con precios; T7 y T29 marcados.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 344 passed, exit 0. Ciclo inline (subagentes sin salida en Pi), sin reviewer.
+## Next Steps
+- Abrir PR de E2 (el usuario lo crea) para que main deje de mostrar estado viejo; decidir si el estimador cobra el tramo >100k por request antes de T8; T8 piloto (gasta modelo, pedir OK).
+## Relevant Files
+- tests/test_gate.py, tests/test_round.py, tests/test_validate.py, tests/test_cli_round.py, docs/task-authoring.md, specs/f3-ronda1/cost-validation.md.
+
 ## 2026-11-02 21:30 Pi — r1-refresco T7 (código) y T29 conformidad, sin tests
 
 ## Goal
