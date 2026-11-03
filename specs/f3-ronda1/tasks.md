@@ -58,7 +58,7 @@ Estimated LOC: 600
 
 ### M6 — Smoke al corte
 - **A6** [observable] — Las seis variantes salen `ok` con conformidad sobre los pins finales y los forzados registran su límite y `cost_source` · `uv run owl gate jobs/smoke-r1` → 6 `ok` y forzados con `limit_hit` correcto
-- [ ] **T38** (R6, R7, R10, R11, R13, R17, R20, R21, R25, R40) — Repetir el smoke de T21 con Haiku 5.5 y los pins del corte (mismos forzados y confirmaciones); resultado en `smoke.md` §"Revisión 4" con la concurrencia definitiva · effect: docs · test: tests/test_gate.py::test_round_conformance_ok
+- [x] **T38** (R6, R7, R10, R11, R13, R17, R20, R21, R25, R40) — Repetir el smoke de T21 con Haiku 5.5 y los pins del corte (mismos forzados y confirmaciones); resultado en `smoke.md` §"Revisión 4" con la concurrencia definitiva · effect: docs · test: tests/test_gate.py::test_round_conformance_ok
 
 ### M7 — Holdout y pre-registro
 - **A7** [observable] — Suite y holdout validan con el `lib.sh` y los prefijos finales, y `rounds/r1/` carga con corte y pins · `uv run owl validate --suite --holdout` → 15 tareas `ok`; `uv run pytest tests/test_rules.py -q` → pasa

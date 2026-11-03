@@ -86,3 +86,72 @@ the `result` events of the trial.
 
 **2, final.** No `infra` and no timeout at concurrency 2 in `main-v2` (six variants, two at a time).
 Design "Línea de corte" item 1 (drop to 1 on `infra` or timeouts) does not fire.
+
+## Revisión 4 (T38, pins del corte 2026-10-28)
+
+Haiku 5.5 (`anthropic/claude-haiku-5-5`), OAuth, Claude Code 2.1.312, Harbor 0.25.0, `owl run --round` con el
+runner real, 2026-11-03. Variantes en sus pins del corte: navori 0.12.3, gentle-ai v4.3.1, superpowers
+v7.0.1@2ce8aa15, ponytail main@09c434ab. 10 trials, $0.055 equivalente API en total; ninguno cuenta para la
+ronda.
+
+**Definiciones de ronda.** Efímeras, en `jobs/smoke-r1/round-<name>/` (git-ignorado, nunca pre-registradas),
+con `cutoff_date` y `pins`, el preámbulo de `specs/r1-refresco/pilot/preamble.md` y los precios de dos tramos
+de `cost-validation.md` §"Revisión 4". `main` corre las seis variantes sobre `tasks/02-smoke-patient` a
+concurrencia 2 con los límites de la ronda (3.0 / 2.0 / 300 / "5.00"). Los forzados corren `vanilla-default`
+sobre `tasks/00-smoke` con un límite cambiado. Gate con la definición de ronda, como en T21:
+`check_jobs(Path('jobs/smoke-r1/<dir>'), Round.load('jobs/smoke-r1/round-<name>'))`.
+
+### Hallazgos (corregidos antes de este registro)
+
+| Corrida | Hallazgo | Causa raíz | Corrección |
+|---|---|---|---|
+| forzado `max_budget_usd = "0.01"` | Con Haiku 5.5 un trial de `00-smoke` cuesta ~$0.002: el tope de T21 ya no se alcanzaría | Precio ~10× menor que Haiku 4.5 | Tope forzado a `"0.0005"` |
+| forzado de presupuesto | `infra` ("zero tokens used: never reached the model") en un trial que gastó $0.00088 | Con 2.1.312, un `error_max_budget_usd` en el primer turno deja `usage` en cero y reporta los tokens solo en `modelUsage` (14 013 cache read, 3 394 cache write, 128 output); el gate leía solo `usage` (`owl/gate.py`) | El gate suma también `inputTokens`, `outputTokens`, `cacheReadInputTokens` y `cacheCreationInputTokens` de `modelUsage` (no los tamaños de ventana); `tests/test_gate.py::test_budget_stop_on_first_turn_counts_model_usage` |
+| forzado `agent_timeout_multiplier = 0.02` (600 s → 12 s) | El trial terminó `success` en 9 s: no se cortó | Haiku 5.5 resuelve `00-smoke` en menos de 12 s | Multiplicador a `0.005` (3 s), `jobs/smoke-r1/timeout-v2` |
+
+### Seis variantes (`jobs/smoke-r1/main`)
+
+Todas `ok` con conformidad de ronda: modelo, versión, `max_turns`, `max_budget_usd`, multiplicadores de
+`lock.json`, artefactos y preámbulo en el primer mensaje `user`. Además reward 1, `cost_source = reported` y
+sin `infra`. La estimación con dos tramos coincide con `total_cost_usd` en las seis.
+
+| Variante | Costo | Turnos | Plugins / MCP | Herramientas | Hueco máx. entre eventos | Agente | `rate_limit_event` |
+|---|---|---|---|---|---|---|---|
+| vanilla-default | $0.0039 | 9 | — / — | 23 | 2.2 s | 13.2 s | `allowed` |
+| placebo | $0.0041 | 10 | — / — | 23 | 2.3 s | 13.0 s | `allowed` |
+| superpowers | $0.0040 | 9 | `superpowers` / — | 23 | 2.8 s | 16.9 s | `allowed` |
+| ponytail | $0.0033 | 7 | `ponytail` / — | 23 | 2.7 s | 14.4 s | `allowed` |
+| gentle-ai | $0.0127 | 9 | `engram` / `context7`, `engram` | 46 | 2.4 s | 19.3 s | `allowed` |
+| navori | $0.0222 | 15 (4 eventos `result`) | — / `engram` | 30 | 3.9 s | 73.2 s | `allowed` |
+
+Condiciones efectivas (T29 D) iguales en las seis: `permissionMode` `bypassPermissions` y
+`per_turn_effort_active` `true`. `output_style` es `default` salvo gentle-ai, que trae `Gentleman`: es su
+persona por default (spike §"v4.3.1") y se mide tal cual. La diferencia en herramientas viene de los MCP
+de cada variante.
+
+### Forzados (`vanilla-default` sobre `tasks/00-smoke`)
+
+| Forzado | Evidencia de Harbor | subtype de `result` | Gate | Costo |
+|---|---|---|---|---|
+| `max_turns = 2` | `agent.kwargs.max_turns = 2` | `error_max_turns` | `ok`, `limit_hit = max_turns`, reward 0 | $0.0013 `reported` |
+| `max_budget_usd = "0.0005"` | `agent.kwargs.max_budget_usd = "0.0005"` | `error_max_budget_usd` (`terminal_reason: budget_exhausted`) | `ok`, `limit_hit = max_budget`, reward 0 | $0.00088 `reported` |
+| `agent_timeout_multiplier = 0.005` (600 s → 3 s) | `lock.json` `agent_timeout_multiplier = 0.005`; `exception_type = AgentTimeoutError` | ninguno (sin evento `result`) | `ok`, `limit_hit = timeout`, reward 0 | $0.00024 `owl_estimate` |
+
+- `--max-budget-usd` aplica con OAuth: el run paró en $0.00088 con tope de $0.0005 (un turno).
+- Con el timeout cortado, el transcript de sesión existe y la estimación reemplaza el `total_cost_usd` que falta.
+
+### Chequeos pedidos por T21
+
+| Chequeo | Resultado |
+|---|---|
+| Preámbulo en el primer mensaje `user` | Presente en cada trial (conformidad) |
+| `--max-budget-usd` con OAuth | Aplica |
+| Estados de `rate_limit_event` | Solo `allowed`; ni `allowed_warning` ni `rejected` |
+| Hueco máx. entre eventos por variante | ≤ 3.9 s; `stall_minutes: 5` deja margen amplio |
+| Telemetría de gentle-ai | `GENTLE_AI_TELEMETRY=0` en el `init` y en el env del agente (`config.json`); el hook `Stop` `gentle-ai telemetry runtime claude --json` corrió sin errores |
+| review stop-hook de gentle-ai | Se disparó (`stop_hook_summary`, `hookCount` 2, 94 ms, `hookErrors` vacío, `preventedContinuation: false`); sin turnos extra en esta tarea fácil |
+
+### Concurrencia
+
+**2, definitiva.** Sin `infra` ni timeouts a concurrencia 2 en `main`. El punto 1 de "Línea de corte" del
+diseño (bajar a 1 ante `infra` o timeouts) no aplica.
