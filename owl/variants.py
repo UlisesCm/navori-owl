@@ -13,6 +13,9 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 VARIANTS_DIR = ROOT / "variants"
+# Set on every `harbor` subprocess owl launches (F3 T29 H1): Harbor sends job and command events
+# to PostHog unless HARBOR_TELEMETRY is 0/false/no/off/disabled (harbor/telemetry.py, 0.25.0).
+HARBOR_ENV = {"HARBOR_TELEMETRY": "0"}
 CACHE_DIR = ROOT / ".owl-cache"
 PATIENT_DIR = ROOT / "patient"
 

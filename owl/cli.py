@@ -32,7 +32,7 @@ from owl.runner import execute_round
 from owl.summary import cmd_summary
 from owl.tasks import resolve_task_args
 from owl.validate import cmd_validate
-from owl.variants import ROOT, Variant
+from owl.variants import HARBOR_ENV, ROOT, Variant
 
 AGENT_IMPORT_PATHS = {
     "claude-code": "owl.agents.claude_code_harness:ClaudeCodeHarness",
@@ -117,7 +117,7 @@ def _harbor_command(
 
 
 def _auth_env(auth: str, variants: list[Variant]) -> dict[str, str]:
-    env = dict(os.environ)
+    env = {**os.environ, **HARBOR_ENV}
     if auth == "oauth":
         bare = [v.id for v in variants if v.bare]
         if bare:
