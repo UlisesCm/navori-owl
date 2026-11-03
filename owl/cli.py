@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import random
@@ -15,23 +16,30 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from owl.gate import check_jobs, write_report
 from owl.patient import ensure_patient_image_for_tasks
 from owl.report import cmd_report
-from owl.round import Round, require_clean_tree, round_jobs_dir, round_tasks
+from owl.round import (
+    Round,
+    load_limits,
+    require_clean_tree,
+    round_jobs_dir,
+    round_tasks,
+)
 from owl.runner import execute_round
 from owl.summary import cmd_summary
 from owl.tasks import resolve_task_args
 from owl.validate import cmd_validate
-from owl.variants import ROOT, Variant
+from owl.variants import HARBOR_ENV, ROOT, Variant
 
 AGENT_IMPORT_PATHS = {
     "claude-code": "owl.agents.claude_code_harness:ClaudeCodeHarness",
     "codex": "codex",
 }
 DEFAULT_MODELS = {
-    "claude-code": "anthropic/claude-haiku-4-5-20251001",
+    "claude-code": "anthropic/claude-haiku-5-5",
     "codex": "openai/gpt-6-luna",
 }
 ENV_FILE = ROOT / ".env"
@@ -39,13 +47,20 @@ ENV_FILE = ROOT / ".env"
 
 def _round_flags(round_def: Round) -> list[str]:
     """Harbor flags that are identical for every variant of a round (R10, R11)."""
-    limits = round_def.limits
-    flags = ["--extra-instruction-path", str(round_def.dir / "preamble.md")]
+    return _limit_flags(round_def.dir / "preamble.md", round_def.limits)
+
+
+def _limit_flags(preamble: Path, limits: dict[str, Any]) -> list[str]:
+    """Preamble and the four limits as Harbor flags; shared by rounds and plain runs (pilot, R6)."""
+    flags = ["--extra-instruction-path", str(preamble)]
     for flag, key in (
         ("--agent-timeout-multiplier", "agent_timeout_multiplier"),
         ("--agent-setup-timeout-multiplier", "agent_setup_timeout_multiplier"),
     ):
         flags += [flag, str(limits[key])]
+    for flag, key in (("--override-cpus", "cpus"), ("--override-memory-mb", "memory_mb")):
+        if key in limits:
+            flags += [flag, str(limits[key])]
     flags += ["--ak", f"max_turns={int(limits['max_turns'])}"]
     # Harbor types max_budget_usd as str and --ak goes through json.loads: pass a JSON string.
     flags += ["--ak", f"max_budget_usd={json.dumps(str(limits['max_budget_usd']))}"]
@@ -53,7 +68,13 @@ def _round_flags(round_def: Round) -> list[str]:
 
 
 def _harbor_command(
-    variant: Variant, task: Path, job_name: str, jobs_dir: Path, model: str, round_def: Round | None = None
+    variant: Variant,
+    task: Path,
+    job_name: str,
+    jobs_dir: Path,
+    model: str,
+    round_def: Round | None = None,
+    limit_flags: list[str] | None = None,
 ) -> list[str]:
     if variant.agent not in AGENT_IMPORT_PATHS:
         raise SystemExit(f"Variant {variant.id}: agent '{variant.agent}' not supported yet (F5).")
@@ -73,6 +94,8 @@ def _harbor_command(
         cmd += ["--ak", f"variant_id={variant.id}"]
     if round_def is not None:
         cmd += _round_flags(round_def)
+    elif limit_flags:
+        cmd += limit_flags
     if variant.agent_version:
         cmd += ["--ak", f"version={variant.agent_version}"]
     if variant.agent == "claude-code":
@@ -97,7 +120,7 @@ def _harbor_command(
 
 
 def _auth_env(auth: str, variants: list[Variant]) -> dict[str, str]:
-    env = dict(os.environ)
+    env = {**os.environ, **HARBOR_ENV}
     if auth == "oauth":
         bare = [v.id for v in variants if v.bare]
         if bare:
@@ -163,12 +186,35 @@ def _run_round(args: argparse.Namespace) -> int:
 
 def cmd_run(args: argparse.Namespace) -> int:
     if args.round:
+        if args.preamble is not None or args.limits is not None:
+            print("--preamble/--limits apply only without --round (a round brings its own).", file=sys.stderr)
+            raise SystemExit(2)
         return _run_round(args)
     if not args.variant:
         print("-v/--variant is required without --round.", file=sys.stderr)
         raise SystemExit(2)
+    if (args.preamble is None) != (args.limits is None):
+        print("--preamble and --limits go together.", file=sys.stderr)
+        raise SystemExit(2)
     variants = [Variant.load(v) for v in args.variant]
     model = _effective_model(variants, args.model)
+    limit_flags: list[str] = []
+    applied: dict[str, Any] = {}
+    if args.preamble is not None:
+        preamble = Path(args.preamble).resolve()
+        if not preamble.is_file():
+            print(f"Preamble file not found: {preamble}", file=sys.stderr)
+            raise SystemExit(2)
+        try:
+            limits = load_limits(args.limits)
+        except SystemExit as exc:
+            print(exc.code, file=sys.stderr)
+            raise SystemExit(2) from None
+        limit_flags = _limit_flags(preamble, limits)
+        applied = {
+            "preamble": {"path": str(preamble), "sha256": hashlib.sha256(preamble.read_bytes()).hexdigest()},
+            "limits": limits,
+        }
     env = _auth_env(args.auth, variants)
     jobs_dir = (ROOT / args.jobs_dir).resolve()
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
@@ -184,13 +230,13 @@ def cmd_run(args: argparse.Namespace) -> int:
             for variant in order:
                 job_name = f"{stamp}__{task_path.name}__{variant.id}__r{rep}"
                 print(f"▶ {job_name}", flush=True)
-                cmd = _harbor_command(variant, task_path, job_name, jobs_dir, model)
+                cmd = _harbor_command(variant, task_path, job_name, jobs_dir, model, limit_flags=limit_flags)
                 code = subprocess.run(cmd, cwd=ROOT, env=env, check=False).returncode
                 job_dir = jobs_dir / job_name
                 job_dir.mkdir(parents=True, exist_ok=True)
                 (job_dir / "owl-variant.json").write_text(
                     json.dumps(
-                        {**variant.raw, "model": model, "auth": args.auth, "harbor_exit_code": code},
+                        {**variant.raw, "model": model, "auth": args.auth, **applied, "harbor_exit_code": code},
                         indent=2,
                     )
                 )
@@ -253,6 +299,14 @@ def main() -> None:
     run.add_argument(
         "--auth", choices=["oauth", "api-key"], default="oauth",
         help="oauth = your subscription (Claude Code / ChatGPT plan login); api-key = ANTHROPIC_API_KEY / OPENAI_API_KEY.",
+    )
+    run.add_argument(
+        "--preamble", default=None, metavar="FILE",
+        help="Without --round: pass FILE as Harbor's extra instruction (pilot, R6). Requires --limits.",
+    )
+    run.add_argument(
+        "--limits", default=None, metavar="FILE",
+        help="Without --round: apply the 'limits' mapping of FILE (round.yaml shape). Requires --preamble.",
     )
     run.add_argument("--jobs-dir", default="jobs")
     run.add_argument("--seed", type=int, default=0)

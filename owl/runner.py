@@ -122,7 +122,7 @@ class _Executor:
                     **variant.raw, "model": self.round_def.model,
                     "auth": self.round_def.raw.get("auth", "oauth"), "harbor_exit_code": code,
                     "round": self.plan["round"], "block": block, "attempt": attempt,
-                    "artifacts": self.plan["artifacts"],
+                    "artifacts": self.plan["artifacts"], "limits": self.round_def.limits,
                 },
                 indent=2,
             )

@@ -273,6 +273,10 @@ class FakeHarbor:
         (trial / "agent" / "claude-code.txt").write_text("".join(json.dumps(e) + "\n" for e in events))
         reward = {"reward": 0} if kind == "fail" else {"reward": 1}
         (trial / "verifier" / "reward.json").write_text(json.dumps(reward))
+        # The job lock Harbor 0.25.0 writes; conformance reads the multipliers from it (F3 T29 H2).
+        lock_trial = {"agent_timeout_multiplier": 3.0, "agent_setup_timeout_multiplier": 2.0,
+                      "environment": {"type": "docker"}}
+        (trial.parent / "lock.json").write_text(json.dumps({"schema_version": 2, "trials": [lock_trial]}))
 
 
 def _fake(jobs_dir: Path, **kw) -> FakeHarbor:
@@ -508,6 +512,10 @@ def test_load_rejects_top_level_limits(env):
         ({"max_budget_usd": 5}, "max_budget_usd"),
         ({"max_budget_usd": "abc"}, "max_budget_usd"),
         ({"max_budget_usd": "0"}, "max_budget_usd"),
+        ({"cpus": 0}, "limits.cpus"),
+        ({"cpus": True}, "limits.cpus"),
+        ({"memory_mb": 1.5}, "limits.memory_mb"),
+        ({"memory_mb": 0}, "limits.memory_mb"),
     ],
 )
 def test_load_rejects_invalid_limits(env, patch, match):
@@ -515,6 +523,24 @@ def test_load_rejects_invalid_limits(env, patch, match):
     limits = {k: v for k, v in limits.items() if v is not None}
     with pytest.raises(SystemExit, match=match):
         rnd.Round.load(_write_round(env, limits=limits), root=env)
+
+
+# Covers: R11, R13 (F3 T29 A)
+def test_load_accepts_optional_resources(env):
+    limits = {**LIMITS, "cpus": 2, "memory_mb": 4096}
+    assert rnd.Round.load(_write_round(env, limits=limits), root=env).limits == limits
+
+
+# Covers: R6 (r1-refresco: the pilot reads a round.yaml-shaped limits file)
+def test_load_limits_validates_like_a_round(tmp_path):
+    path = tmp_path / "limits.yaml"
+    path.write_text(yaml.safe_dump({"limits": {**LIMITS, "cpus": 2}}))
+    assert rnd.load_limits(path) == {**LIMITS, "cpus": 2}
+    path.write_text(yaml.safe_dump({"limits": {**LIMITS, "max_turns": 0}}))
+    with pytest.raises(SystemExit, match="max_turns"):
+        rnd.load_limits(path)
+    with pytest.raises(SystemExit, match="Limits file not found"):
+        rnd.load_limits(tmp_path / "missing.yaml")
 
 
 # Covers: R1, R3 (round-protocol)

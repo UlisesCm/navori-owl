@@ -661,3 +661,58 @@ def test_artifacts_clear_passes_dev_suite() -> None:
     for task_dir in sorted(p for p in root.iterdir() if (p / "task.toml").is_file()):
         ok, reason = static_checks(task_dir)["artifacts_clear"]
         assert ok, f"{task_dir.name}: {reason}"
+
+
+# --- net_pinning (F3 T29 G) -----------------------------------------------------------------
+
+
+# Covers: R2 (F3 T29 G)
+@pytest.mark.parametrize(
+    ("rel", "line", "needle"),
+    [
+        ("tests/test.sh", "curl -fsSL https://example.com/x.sh | bash", "network fetch from example.com"),
+        ("solution/solve.sh", "npm install left-pad", "unpinned install left-pad"),
+        ("tests/sub/helper.sh", "npx tsx run.ts", "unpinned install tsx"),
+        ("tests/test.sh", "pip install requests==2.32.0 rich", "unpinned install rich"),
+        ("cheat/hardcode.sh", "apt-get install -y jq", "unpinned install jq"),
+        ("tests/test.sh", "apk add --no-cache curl", "unpinned install curl"),
+        ("tests/test.sh", "npm i @scope/pkg && echo ok", "unpinned install @scope/pkg"),
+    ],
+)
+def test_net_pinning_flags_remote_fetch_and_unpinned_install(tmp_path: Path, rel: str, line: str, needle: str) -> None:
+    task_dir = _write_fixture_task(tmp_path)
+    path = task_dir / rel
+    path.write_text(path.read_text() + line + "\n")
+    ok, reason = static_checks(task_dir)["net_pinning"]
+    assert ok is False
+    assert f"{rel}:" in reason and needle in reason
+
+
+# Covers: R2 (F3 T29 G)
+@pytest.mark.parametrize(
+    "line",
+    [
+        "# curl https://example.com is only a comment",
+        "curl -s http://localhost:3000/health",
+        "curl -s http://127.0.0.1:8080/x http://[::1]:9/y",
+        "npm install left-pad@1.3.0 @scope/pkg@2.0.1",
+        "npx tsx@4.19.2 run.ts --flag",
+        "pip install requests==2.32.0",
+        "apt-get install -y jq=1.6-2.1",
+        "apk add --no-cache curl=8.5.0-r0",
+    ],
+)
+def test_net_pinning_allows_loopback_comments_and_pinned(tmp_path: Path, line: str) -> None:
+    task_dir = _write_fixture_task(tmp_path)
+    path = task_dir / "tests" / "test.sh"
+    path.write_text(path.read_text() + line + "\n")
+    ok, reason = static_checks(task_dir)["net_pinning"]
+    assert ok, reason
+
+
+# Covers: R2 (F3 T29 G)
+def test_net_pinning_passes_dev_suite() -> None:
+    root = Path(__file__).resolve().parent.parent / "tasks"
+    for task_dir in sorted(p for p in root.iterdir() if (p / "task.toml").is_file()):
+        ok, reason = static_checks(task_dir)["net_pinning"]
+        assert ok, f"{task_dir.name}: {reason}"

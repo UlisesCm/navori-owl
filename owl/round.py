@@ -20,6 +20,8 @@ from owl.tasks import HOLDOUT_DIR, burned_tasks, exit_refused, refuse_holdout
 from owl.variants import ROOT, Variant
 
 LIMIT_KEYS = ("agent_timeout_multiplier", "agent_setup_timeout_multiplier", "max_turns", "max_budget_usd")
+# Optional fixed container resources (F3 T29 A): passed as Harbor --override-cpus/--override-memory-mb.
+RESOURCE_KEYS = ("cpus", "memory_mb")
 PRICE_KEYS = ("input", "output", "cache_read", "cache_write_5m", "cache_write_1h")
 _ROUND_FILES = ("RULES.md", "round.yaml", "preamble.md")
 _CLEAN_DIRS = ("tasks", "holdout", "variants", "owl", "patient")
@@ -145,18 +147,27 @@ def _validate_pins(path: Path, data: dict[str, Any], variants: list[Variant]) ->
     return cutoff_date, {"harbor": str(pins["harbor"]), "variants": variant_pins}
 
 
+def load_limits(path: Path | str) -> dict[str, Any]:
+    """The ``limits`` mapping of a YAML file shaped like round.yaml, validated as a round's (R6 pilot)."""
+    path = Path(path)
+    if not path.is_file():
+        raise SystemExit(f"Limits file not found: {path}")
+    return _validate_limits(path, yaml.safe_load(path.read_text()) or {})
+
+
 def _validate_limits(path: Path, data: dict[str, Any]) -> dict[str, Any]:
-    """The round's ``limits`` mapping with exactly the four LIMIT_KEYS, typed; exit otherwise (R11, R13)."""
+    """The round's ``limits`` mapping with exactly the four LIMIT_KEYS plus any RESOURCE_KEYS, typed;
+    exit otherwise (R11, R13)."""
     limits = data.get("limits")
     if not isinstance(limits, dict):
         stray = [k for k in LIMIT_KEYS if k in data]
         hint = f" (found at top level: {', '.join(stray)}; nest them under 'limits')" if stray else ""
         raise SystemExit(f"{path}: missing required mapping 'limits'{hint}")
     missing = [k for k in LIMIT_KEYS if k not in limits]
-    extra = [k for k in limits if k not in LIMIT_KEYS]
+    extra = [k for k in limits if k not in LIMIT_KEYS + RESOURCE_KEYS]
     if missing or extra:
         raise SystemExit(
-            f"{path}: limits must have exactly {', '.join(LIMIT_KEYS)}"
+            f"{path}: limits must have exactly {', '.join(LIMIT_KEYS)} (optional: {', '.join(RESOURCE_KEYS)})"
             + (f"; missing: {', '.join(missing)}" if missing else "")
             + (f"; unknown: {', '.join(map(str, extra))}" if extra else "")
         )
@@ -167,9 +178,15 @@ def _validate_limits(path: Path, data: dict[str, Any]) -> dict[str, Any]:
     for key in ("agent_timeout_multiplier", "agent_setup_timeout_multiplier"):
         if not number(limits[key]):
             raise SystemExit(f"{path}: limits.{key} must be a number > 0")
-    turns = limits["max_turns"]
-    if isinstance(turns, bool) or not isinstance(turns, int) or turns < 1:
+    def positive_int(v: object) -> bool:
+        return isinstance(v, int) and not isinstance(v, bool) and v >= 1
+
+    if not positive_int(limits["max_turns"]):
         raise SystemExit(f"{path}: limits.max_turns must be an integer >= 1")
+    if "cpus" in limits and not number(limits["cpus"]):
+        raise SystemExit(f"{path}: limits.cpus must be a number > 0")
+    if "memory_mb" in limits and not positive_int(limits["memory_mb"]):
+        raise SystemExit(f"{path}: limits.memory_mb must be an integer >= 1")
     budget = limits["max_budget_usd"]
     try:
         ok = isinstance(budget, str) and Decimal(budget) > 0 and Decimal(budget).is_finite()

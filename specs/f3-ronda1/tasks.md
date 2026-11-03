@@ -54,7 +54,7 @@ Estimated LOC: 600
 
 ### M5 — Conformidad
 - **A5** [observable] — Telemetría de Harbor apagada; multiplicadores de timeout leídos de `lock.json`; recursos fijos; esfuerzo, permisos y herramientas registrados por trial; chequeo `net_pinning` en `owl validate` · `uv run pytest tests/test_gate.py tests/test_round.py tests/test_cli_round.py tests/test_validate.py -q` → todas pasan
-- [ ] **T29** (R6, R7, R10, R11, R17, R20, R21) — Workplan `f3-conformity` revisado contra `origin/main`: H1 `HARBOR_TELEMETRY=0` en todo subproceso `harbor`; H2 multiplicadores de timeout desde `lock.json` (la versión y `exception_type` ya se leen); A `cpus` y `memory_mb` en `limits`; D esfuerzo, modo de permisos y herramientas efectivas por trial; G chequeo estático `net_pinning` · effect: behavior · test: tests/test_gate.py::test_conformity_reads_lock_multipliers
+- [x] **T29** (R6, R7, R10, R11, R17, R20, R21) — Workplan `f3-conformity` revisado contra `origin/main`: H1 `HARBOR_TELEMETRY=0` en todo subproceso `harbor`; H2 multiplicadores de timeout desde `lock.json` (la versión y `exception_type` ya se leen); A `cpus` y `memory_mb` en `limits`; D esfuerzo, modo de permisos y herramientas efectivas por trial; G chequeo estático `net_pinning` · effect: behavior · test: tests/test_gate.py::test_conformity_reads_lock_multipliers
 
 ### M6 — Smoke al corte
 - **A6** [observable] — Las seis variantes salen `ok` con conformidad sobre los pins finales y los forzados registran su límite y `cost_source` · `uv run owl gate jobs/smoke-r1` → 6 `ok` y forzados con `limit_hit` correcto

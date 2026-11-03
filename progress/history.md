@@ -1,3 +1,54 @@
+## 2026-11-03 15:20 Pi — r1-refresco: deuda de tests de T7/T29 saldada y precios de Haiku 5.5
+
+## Goal
+Saldar la deuda antes del PR de E2: fixtures con lock.json, doc de autoría, tests nuevos y precios de Haiku 5.5.
+## Discoveries
+- Arrancando en main se volvió a rehacer el spike de M4 (progress de main no ve la rama sin mergear); no se escribió nada. Datos nuevos: engram releases/latest ya es 3.6.1 (gentle-ai no lo fija) y el plugin sigue en 0.1.21.
+- Haiku 5.5 cobra por longitud de prompt: ≤100k tokens input 0.10, output 0.50, cache read 0.01, write 5m 0.125, write 1h 0.20; >100k 0.50/2.50/0.05/0.625/1.00 (platform.claude.com pricing, 2026-11-03). El estimador usa un solo juego de precios: riesgo para R7 en el piloto.
+## Accomplished
+- lock.json en FakeHarbor (test_round) y en _round_trial (test_gate); tests: test_conformity_reads_lock_multipliers, recursos cpus/memory_mb, condiciones efectivas, limits opcionales y load_limits, net_pinning (+/− y suite dev), test_default_claude_model_is_haiku_5_5, flags de recursos y del piloto, HARBOR_TELEMETRY=0 en cli y validate, cmd_run --preamble/--limits.
+- docs/task-authoring.md documenta net_pinning; cost-validation.md §"Revisión 4" con precios; T7 y T29 marcados.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 344 passed, exit 0. Ciclo inline (subagentes sin salida en Pi), sin reviewer.
+## Next Steps
+- Abrir PR de E2 (el usuario lo crea) para que main deje de mostrar estado viejo; decidir si el estimador cobra el tramo >100k por request antes de T8; T8 piloto (gasta modelo, pedir OK).
+## Relevant Files
+- tests/test_gate.py, tests/test_round.py, tests/test_validate.py, tests/test_cli_round.py, docs/task-authoring.md, specs/f3-ronda1/cost-validation.md.
+
+## 2026-11-02 21:30 Pi — r1-refresco T7 (código) y T29 conformidad, sin tests
+
+## Goal
+Avanzar solo código (pedido del usuario: sin tests ni doctrina).
+## Discoveries
+- M4 ya estaba en feat/r1-refresco-e2 sin mergear y progress de main no lo decía: se rehízo por error (rama wip/r1-e2-m4-duplicado, descartable).
+- Harbor 0.25.0: telemetría PostHog salvo HARBOR_TELEMETRY en 0/false/no/off/disabled; lock.json guarda agent_(setup_)timeout_multiplier y environment.override_cpus/override_memory_mb, omitidos si son None.
+- El plugin engram de gentle-ai derivó de 0.1.19 a 0.1.21 entre el 10-30 y el 11-02.
+## Accomplished
+- DEFAULT_MODELS claude-code → anthropic/claude-haiku-5-5; owl run --preamble/--limits fuera de ronda (piloto).
+- T29: H1 HARBOR_TELEMETRY=0 en cli y validate; H2/A conformidad desde lock.json y limits.cpus/memory_mb opcionales (--override-cpus/--override-memory-mb, limits en owl-variant.json); D permission_mode/tools/effort en TrialGate; G net_pinning.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 10 failed, 301 passed (fixtures sin lock.json y doc de autoría sin net_pinning).
+## Next Steps
+- Fixtures y tests nuevos, doc de autoría, T7 precios; luego T8 piloto (pedir OK).
+## Relevant Files
+- owl/cli.py, owl/round.py, owl/runner.py, owl/gate.py, owl/validate.py, owl/variants.py.
+
+## 2026-10-30 09:10 Pi — r1-refresco E2 M4: gentle-ai v4.3.1 confirmado con claude real
+
+## Goal
+Cerrar r1-refresco E2 M4 (spike y manifiesto de gentle-ai v4.3.1).
+## Discoveries
+- Una sesión previa dejó a2042db sin push en feat/r1-refresco-e2 (spike con stub, expect pendiente).
+- Con Claude Code 2.1.312 real sin modelo: plugin engram@engram 0.1.19 y MCP de usuario engram quedan en CLAUDE_CONFIG_DIR; expect [engram] / [context7, engram] se mantiene. El stub hacía parecer que v4 quitaba el MCP.
+- Telemetría: listener local ve conexiones sin la variable y 0 con GENTLE_AI_TELEMETRY=0. engram 3.6.0 (releases/latest); plugin de la rama por defecto del marketplace, sin fijar.
+- v4 retiró SDD/openspec: artifacts solo odd/tasks/; .atl/ runtime_state; autoridad de RDD en .git/gentle-ai/ (fuera del snapshot).
+- Subagentes navori siguen sin salida en Pi: spike, auditoría y revisión inline, sin contexto fresco.
+## Accomplished
+- variants/gentle-ai.yaml v4.3.1 (checksums, comentarios de divulgación), spike §"v4.3.1" con comprobación real, artifacts-audit, trazabilidad R2-R4 de r1-refresco en tests; T5 y T6 marcadas.
+- Gate: ruff check . verde; uv run pytest -q (docker incluido) 396 passed; A4 4 passed.
+## Next Steps
+- M5: T7 precios oficiales de Haiku 5.5 y DEFAULT_MODELS; T8 piloto de 24 trials (gasta modelo, requiere OK). PR de E2 al cerrar M5.
+## Relevant Files
+- variants/gentle-ai.yaml, specs/f3-ronda1/spike-gentle-ai.md, specs/f3-ronda1/artifacts-audit.md, specs/r1-refresco/tasks.md, tests/test_variants.py, tests/test_validate_docker.py.
+
 ## 2026-10-28 18:20 Pi — r1-refresco E1: plataforma al corte (Harbor, Claude Code, harnesses, prefijos)
 
 ## Goal
