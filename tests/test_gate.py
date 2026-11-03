@@ -217,8 +217,17 @@ def _round(tmp_path: Path, **raw: object) -> Round:
     )
 
 
+LOCK_TRIAL = {"agent_timeout_multiplier": 3.0, "agent_setup_timeout_multiplier": 2.0, "environment": {"type": "docker"}}
+
+
+def _write_lock(job_dir: Path, *trials: dict) -> None:
+    """The job's lock.json as Harbor 0.25.0 writes it (models/job/lock.py; unset keys absent)."""
+    (job_dir / "lock.json").write_text(json.dumps({"schema_version": 2, "trials": list(trials)}))
+
+
 def _round_trial(tmp_path: Path, first_user: str | None, **kwargs_over: object) -> Path:
     trial = _trial(tmp_path, [INIT, _result()])
+    _write_lock(tmp_path, LOCK_TRIAL)
     kwargs = {"version": "2.1.281", "max_turns": 300, "max_budget_usd": "5.00", **kwargs_over}
     (trial / "config.json").write_text(json.dumps({"agent": {"model_name": "anthropic/claude-haiku-4-5-20251001", "kwargs": kwargs}}))
     if first_user is not None:
@@ -246,6 +255,63 @@ def test_round_conformance_mismatch_is_contamination(tmp_path: Path) -> None:
     gate = check_trial(trial, ROUND_VARIANT, _round(tmp_path))
     assert gate.category == "contamination"
     assert any("max_turns" in r for r in gate.reasons)
+
+
+def test_conformity_reads_lock_multipliers(tmp_path: Path) -> None:
+    """Covers: R13 (F3 T29 H2/A: multipliers and resources come from the job's lock.json)."""
+    trial = _round_trial(tmp_path, "fix it\n\nWork unattended.\n")
+    _write_lock(tmp_path, {**LOCK_TRIAL, "agent_timeout_multiplier": 1.0})
+    gate = check_trial(trial, ROUND_VARIANT, _round(tmp_path))
+    assert gate.category == "contamination"
+    assert any("agent_timeout_multiplier expected 3.0, recorded 1.0" in r for r in gate.reasons)
+
+    # Unset multiplier: Harbor omits the key, so the recorded value is None, not the round's.
+    _write_lock(tmp_path, {k: v for k, v in LOCK_TRIAL.items() if k != "agent_setup_timeout_multiplier"})
+    gate = check_trial(trial, ROUND_VARIANT, _round(tmp_path))
+    assert any("agent_setup_timeout_multiplier expected 2.0, recorded None" in r for r in gate.reasons)
+
+    (tmp_path / "lock.json").unlink()
+    gate = check_trial(trial, ROUND_VARIANT, _round(tmp_path))
+    assert gate.category == "contamination"
+    assert any("lock.json unreadable or without trials" in r for r in gate.reasons)
+
+    _write_lock(tmp_path)
+    gate = check_trial(trial, ROUND_VARIANT, _round(tmp_path))
+    assert any("lock.json unreadable or without trials" in r for r in gate.reasons)
+
+
+def test_conformity_checks_lock_resources(tmp_path: Path) -> None:
+    """Covers: R13 (F3 T29 A: limits.cpus/memory_mb against environment.override_* in lock.json)."""
+    trial = _round_trial(tmp_path, "fix it\n\nWork unattended.\n")
+    rnd = _round(tmp_path)
+    rnd.limits.update(cpus=2, memory_mb=4096)
+    env = {"type": "docker", "override_cpus": 2, "override_memory_mb": 4096}
+    _write_lock(tmp_path, {**LOCK_TRIAL, "environment": env})
+    gate = check_trial(trial, ROUND_VARIANT, rnd)
+    assert gate.passed is True and gate.category == "ok"
+
+    _write_lock(tmp_path, {**LOCK_TRIAL, "environment": {**env, "override_memory_mb": 2048}})
+    gate = check_trial(trial, ROUND_VARIANT, rnd)
+    assert gate.category == "contamination"
+    assert any("memory_mb expected 4096.0, recorded 2048.0" in r for r in gate.reasons)
+
+    # A round without resources fails a trial Harbor ran with an override.
+    _write_lock(tmp_path, {**LOCK_TRIAL, "environment": env})
+    gate = check_trial(trial, ROUND_VARIANT, _round(tmp_path))
+    assert any("cpus expected None, recorded 2.0" in r for r in gate.reasons)
+
+
+def test_gate_records_effective_run_conditions(tmp_path: Path) -> None:
+    """Covers: R13 (F3 T29 D: permission mode, tools and effort keys of system/init, recorded only)."""
+    init = {
+        **INIT, "permissionMode": "bypassPermissions", "tools": ["Read", "Bash", "Edit"],
+        "output_style": "default", "effortLevel": "high", "thinking_budget": 0, "model": "m",
+    }
+    gate = check_trial(_trial(tmp_path, [init, _result()]), VARIANT)
+    assert gate.passed is True
+    assert gate.permission_mode == "bypassPermissions"
+    assert gate.tools == ["Bash", "Edit", "Read"]
+    assert gate.effort == {"output_style": "default", "effortLevel": "high", "thinking_budget": 0}
 
 
 def test_preamble_missing_is_contamination(tmp_path: Path) -> None:

@@ -405,7 +405,7 @@ Qué comprueba:
 **Estáticos** (sin Docker), nombres exactos de los checks:
 
 <!-- owl-doc:static_checks -->
-`canary`, `lib_identity`, `reward_subset`, `required_files`, `metadata`, `category`, `holdout_coherence`, `artifacts_clear`
+`canary`, `lib_identity`, `reward_subset`, `required_files`, `metadata`, `category`, `holdout_coherence`, `artifacts_clear`, `net_pinning`
 <!-- /owl-doc:static_checks -->
 
 - `canary`: el GUID está en cada archivo de la sección 8.
@@ -422,6 +422,10 @@ Qué comprueba:
 - `artifacts_clear`: ningún archivo de `environment/` está bajo un prefijo `artifacts` de `variants/*.yaml`
   ni nombra una ruta bajo uno (el paciente no debe ocultar ni depender de lo que una variante escribe).
   En el holdout el reporte trae solo el nombre del chequeo.
+- `net_pinning`: `tests/`, `solution/` y `cheat/` no bajan nada de la red (una URL `http(s)://` a un host
+  que no sea `localhost`, `127.0.0.1`, `0.0.0.0` o `[::1]`) ni instalan paquetes sin versión (`npm install`,
+  `npx`, `pip install`, `apt-get install`, `apk add` con `paquete@1.2.3`, `==1.2.3` o `=1.2.3`), para que el
+  veredicto no cambie con un release upstream. Las líneas de comentario no cuentan.
 - Sin `task.toml`, el único check es `task_toml` y falla.
 
 **Dinámicos** (Harbor, sin modelo):
