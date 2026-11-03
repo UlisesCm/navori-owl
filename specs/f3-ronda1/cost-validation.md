@@ -73,10 +73,27 @@ Fuente: precios oficiales de Anthropic, `https://platform.claude.com/docs/en/abo
 
 `DEFAULT_MODELS["claude-code"]` = `anthropic/claude-haiku-5-5` (`owl/cli.py`).
 
-**Riesgo para R7, abierto:** Haiku 5.5 es el único modelo de la tabla con precio por longitud de prompt. Cada
-request se cobra por separado, y el tramo alto aplica cuando `input + cache_read + cache_write` del request
-pasa de 100 000 tokens, aunque parte del prompt sea un cache hit. Hoy `estimate_cost_from_sessions` aplica un
-solo juego de cinco precios. Si un trial del piloto tiene algún request por encima del umbral, ese trial
-queda fuera de tolerancia con estos cinco precios. El estimador ya calcula por `message.id`, así que
-corregirlo por request se puede. Si hay que hacerlo, se decide con evidencia del piloto (R7), y no se relaja
-la tolerancia. Mientras tanto, T23 copia a `round.yaml` la columna ≤ 100 000.
+**Precio por tramo (T9, R7):** Haiku 5.5 es el único modelo de la tabla con precio por longitud de prompt. Cada
+request se cobra por separado, y el tramo alto aplica a todo el request cuando su `input + cache_read +
+cache_write` pasa de 100 000 tokens, aunque parte del prompt sea un cache hit. `estimate_cost_from_sessions`
+elige el tramo por `message.id` cuando `prices_usd_per_mtok` trae `long_context`. T23 copia las dos columnas a
+`round.yaml`:
+
+```yaml
+prices_usd_per_mtok:
+  input: 0.10
+  output: 0.50
+  cache_read: 0.01
+  cache_write_5m: 0.125
+  cache_write_1h: 0.20
+  long_context:
+    above_prompt_tokens: 100000
+    input: 0.50
+    output: 2.50
+    cache_read: 0.05
+    cache_write_5m: 0.625
+    cache_write_1h: 1.00
+```
+
+No comprobado hasta el piloto: que `total_cost_usd` de Claude Code aplique el tramo igual (umbral estricto,
+todo el request al precio alto).

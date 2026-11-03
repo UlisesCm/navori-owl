@@ -84,6 +84,31 @@ def test_load_requires_split_cache_prices(env):
         rnd.Round.load(_write_round(env, prices_usd_per_mtok=prices), root=env)
 
 
+# Covers: R5, R7 (r1-refresco: prices by prompt length)
+def test_load_accepts_long_context_tier(env):
+    tier = {**PRICES, "above_prompt_tokens": 100_000}
+    loaded = rnd.Round.load(_write_round(env, prices_usd_per_mtok={**PRICES, "long_context": tier}), root=env)
+    assert loaded.prices_usd_per_mtok["long_context"] == {
+        **{k: float(v) for k, v in PRICES.items()}, "above_prompt_tokens": 100_000,
+    }
+
+
+# Covers: R5, R7 (r1-refresco)
+@pytest.mark.parametrize(
+    ("tier", "match"),
+    [
+        ({**PRICES}, "above_prompt_tokens must be an integer"),
+        ({**PRICES, "above_prompt_tokens": 0}, "above_prompt_tokens must be an integer"),
+        ({**PRICES, "above_prompt_tokens": 1.5}, "above_prompt_tokens must be an integer"),
+        ({"input": 1, "above_prompt_tokens": 100_000}, "long_context is missing: output"),
+        ("high", "long_context must be a mapping"),
+    ],
+)
+def test_load_rejects_invalid_long_context_tier(env, tier, match):
+    with pytest.raises(SystemExit, match=match):
+        rnd.Round.load(_write_round(env, prices_usd_per_mtok={**PRICES, "long_context": tier}), root=env)
+
+
 # Covers: R1, R3, R4, R5
 def test_artifacts_union(env):
     loaded = rnd.Round.load(_write_round(env), root=env)
