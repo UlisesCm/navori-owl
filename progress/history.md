@@ -1,3 +1,20 @@
+## 2026-11-02 21:30 Pi — r1-refresco T7 (código) y T29 conformidad, sin tests
+
+## Goal
+Avanzar solo código (pedido del usuario: sin tests ni doctrina).
+## Discoveries
+- M4 ya estaba en feat/r1-refresco-e2 sin mergear y progress de main no lo decía: se rehízo por error (rama wip/r1-e2-m4-duplicado, descartable).
+- Harbor 0.25.0: telemetría PostHog salvo HARBOR_TELEMETRY en 0/false/no/off/disabled; lock.json guarda agent_(setup_)timeout_multiplier y environment.override_cpus/override_memory_mb, omitidos si son None.
+- El plugin engram de gentle-ai derivó de 0.1.19 a 0.1.21 entre el 10-30 y el 11-02.
+## Accomplished
+- DEFAULT_MODELS claude-code → anthropic/claude-haiku-5-5; owl run --preamble/--limits fuera de ronda (piloto).
+- T29: H1 HARBOR_TELEMETRY=0 en cli y validate; H2/A conformidad desde lock.json y limits.cpus/memory_mb opcionales (--override-cpus/--override-memory-mb, limits en owl-variant.json); D permission_mode/tools/effort en TrialGate; G net_pinning.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 10 failed, 301 passed (fixtures sin lock.json y doc de autoría sin net_pinning).
+## Next Steps
+- Fixtures y tests nuevos, doc de autoría, T7 precios; luego T8 piloto (pedir OK).
+## Relevant Files
+- owl/cli.py, owl/round.py, owl/runner.py, owl/gate.py, owl/validate.py, owl/variants.py.
+
 ## 2026-10-30 09:10 Pi — r1-refresco E2 M4: gentle-ai v4.3.1 confirmado con claude real
 
 ## Goal
