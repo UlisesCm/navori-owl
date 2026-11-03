@@ -83,6 +83,10 @@ class TrialGate:
     effort: dict = field(default_factory=dict)
 
 
+# Token counts of a `result` event's `modelUsage` entry (not contextWindow/maxOutputTokens, which are sizes).
+_MODEL_USAGE_TOKEN_KEYS = ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens")
+
+
 def _fail(gate: TrialGate, reason: str, category: str, infra_reason: str | None = None) -> None:
     """Record a failure reason under a bucket; contamination is sticky (never downgraded).
 
@@ -301,6 +305,14 @@ def _check_claude_code(gate: TrialGate, trial_dir: Path, variant: dict, stall_mi
     else:
         usage = result.get("usage") or {}
         tokens = sum(v for v in usage.values() if isinstance(v, (int, float)))
+        # Claude Code 2.1.312 leaves `usage` at zero when a limit stops the first turn
+        # (error_max_budget_usd) and reports the tokens only per model in `modelUsage`.
+        for per_model in (result.get("modelUsage") or {}).values():
+            if isinstance(per_model, dict):
+                tokens += sum(
+                    v for k in _MODEL_USAGE_TOKEN_KEYS
+                    if isinstance(v := per_model.get(k), (int, float)) and not isinstance(v, bool)
+                )
         if not tokens:
             _fail(gate, "zero tokens used: never reached the model", "infra", "other")
 

@@ -202,6 +202,35 @@ def test_nonzero_exit_is_agent_exit(tmp_path: Path) -> None:
     assert gate.category == "infra" and gate.infra_reason == "agent_exit"
 
 
+ZERO_USAGE = {"input_tokens": 0, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0, "output_tokens": 0}
+MODEL_USAGE = {"claude-haiku-5-5": {
+    "inputTokens": 2, "outputTokens": 128, "cacheReadInputTokens": 14013, "cacheCreationInputTokens": 3394,
+    "costUSD": 0.00088313, "contextWindow": 1000000, "maxOutputTokens": 128000,
+}}
+
+
+def test_budget_stop_on_first_turn_counts_model_usage(tmp_path: Path) -> None:
+    """Covers: R17, R20 (smoke T38: Claude Code 2.1.312 leaves `usage` at zero on error_max_budget_usd
+    and reports the tokens only in `modelUsage`; that trial reached the model)."""
+    result = _result(subtype="error_max_budget_usd", is_error=True, usage=ZERO_USAGE, modelUsage=MODEL_USAGE,
+                     total_cost_usd=0.00088313)
+    gate = check_trial(_trial(tmp_path, [INIT, result], "NonZeroAgentExitCodeError"), VARIANT)
+    assert not any("zero tokens" in r for r in gate.reasons)
+    assert gate.passed is True and gate.category == "ok" and gate.limit_hit == "max_budget"
+
+
+@pytest.mark.parametrize(
+    "model_usage",
+    [None, {"claude-haiku-5-5": {"inputTokens": 0, "outputTokens": 0, "contextWindow": 1000000,
+                                 "maxOutputTokens": 128000}}],
+)
+def test_zero_tokens_everywhere_is_infra(tmp_path: Path, model_usage: dict | None) -> None:
+    """Covers: R17 (window sizes in `modelUsage` are not tokens used)."""
+    result = _result(usage=ZERO_USAGE, **({"modelUsage": model_usage} if model_usage else {}))
+    gate = check_trial(_trial(tmp_path, [INIT, result]), VARIANT)
+    assert gate.category == "infra" and any("zero tokens used" in r for r in gate.reasons)
+
+
 def _round(tmp_path: Path, **raw: object) -> Round:
     rdir = tmp_path / "round"
     rdir.mkdir(exist_ok=True)
