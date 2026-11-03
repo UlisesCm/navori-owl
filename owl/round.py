@@ -145,6 +145,14 @@ def _validate_pins(path: Path, data: dict[str, Any], variants: list[Variant]) ->
     return cutoff_date, {"harbor": str(pins["harbor"]), "variants": variant_pins}
 
 
+def load_limits(path: Path | str) -> dict[str, Any]:
+    """The ``limits`` mapping of a YAML file shaped like round.yaml, validated as a round's (R6 pilot)."""
+    path = Path(path)
+    if not path.is_file():
+        raise SystemExit(f"Limits file not found: {path}")
+    return _validate_limits(path, yaml.safe_load(path.read_text()) or {})
+
+
 def _validate_limits(path: Path, data: dict[str, Any]) -> dict[str, Any]:
     """The round's ``limits`` mapping with exactly the four LIMIT_KEYS, typed; exit otherwise (R11, R13)."""
     limits = data.get("limits")
