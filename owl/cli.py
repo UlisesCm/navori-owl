@@ -58,6 +58,9 @@ def _limit_flags(preamble: Path, limits: dict[str, Any]) -> list[str]:
         ("--agent-setup-timeout-multiplier", "agent_setup_timeout_multiplier"),
     ):
         flags += [flag, str(limits[key])]
+    for flag, key in (("--override-cpus", "cpus"), ("--override-memory-mb", "memory_mb")):
+        if key in limits:
+            flags += [flag, str(limits[key])]
     flags += ["--ak", f"max_turns={int(limits['max_turns'])}"]
     # Harbor types max_budget_usd as str and --ak goes through json.loads: pass a JSON string.
     flags += ["--ak", f"max_budget_usd={json.dumps(str(limits['max_budget_usd']))}"]

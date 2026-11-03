@@ -402,6 +402,35 @@ def _first_user_text(trial_dir: Path) -> str | None:
     return str(step.get("message", "")) if step else None
 
 
+def _lock_checks(gate: TrialGate, trial_dir: Path, limits: dict) -> list[tuple[str, object, object]]:
+    """T29 H2/A: timeout multipliers and container resources as Harbor applied them, from the job's
+    ``lock.json`` (the trial's config.json does not record them). Unset keys are absent from the lock."""
+    try:
+        lock = json.loads((trial_dir.parent / "lock.json").read_text())
+        entries = [t for t in lock.get("trials") or [] if isinstance(t, dict)]
+    except (OSError, json.JSONDecodeError, AttributeError):
+        entries = []
+    if not entries:
+        _fail(gate, "round conformance: lock.json unreadable or without trials", "contamination")
+        return []
+
+    def num(value: object) -> float | None:
+        return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+    checks: list[tuple[str, object, object]] = []
+    for entry in entries:
+        env = entry.get("environment") if isinstance(entry.get("environment"), dict) else {}
+        for name, expected, actual in (
+            ("agent_timeout_multiplier", limits["agent_timeout_multiplier"], entry.get("agent_timeout_multiplier")),
+            ("agent_setup_timeout_multiplier", limits["agent_setup_timeout_multiplier"],
+             entry.get("agent_setup_timeout_multiplier")),
+            ("cpus", limits.get("cpus"), env.get("override_cpus")),
+            ("memory_mb", limits.get("memory_mb"), env.get("override_memory_mb")),
+        ):
+            checks.append((name, num(expected), num(actual)))
+    return checks
+
+
 def _check_round_conformance(gate: TrialGate, trial_dir: Path, variant: dict, round_def: Round) -> None:
     """R13: recorded model, version, limits, artifacts, system-prompt addition and preamble match the round."""
     try:
@@ -420,13 +449,13 @@ def _check_round_conformance(gate: TrialGate, trial_dir: Path, variant: dict, ro
         ("version", round_def.agent_version, str(kwargs.get("version"))),
         ("append_system_prompt", (variant.get("harness") or {}).get("append_system_prompt"), kwargs.get("append_system_prompt")),
     ]
-    # Harbor's trial config.json does not record the timeout multipliers: only these two are comparable.
     checks.append(("max_turns", str(limits["max_turns"]), str(kwargs.get("max_turns"))))
     checks.append(("max_budget_usd", str(limits["max_budget_usd"]), str(kwargs.get("max_budget_usd"))))
     if round_def.artifacts:
         got = kwargs.get("artifacts")
         got_list = got.split(",") if isinstance(got, str) else list(got or [])
         checks.append(("artifacts", sorted(round_def.artifacts), sorted(got_list)))
+    checks += _lock_checks(gate, trial_dir, limits)
     for name, expected, actual in checks:
         if expected != actual:
             _fail(gate, f"round conformance: {name} expected {expected!r}, recorded {actual!r}", "contamination")
