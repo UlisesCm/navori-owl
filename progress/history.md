@@ -1,3 +1,19 @@
+## 2026-11-03 16:30 Pi — r1-refresco T8: piloto de 24 trials con Haiku 5.5
+
+## Goal
+Cerrar r1-refresco E2 con el piloto (R6, R7), aprobado por el usuario.
+## Discoveries
+- #36 se mergeó en 69542ce, antes de los commits de T9: van en el PR #37 (`feat/r1-refresco-t9`).
+- Piloto: 24/24 gate ok sin infra, contaminación ni límites; el estimador reproduce total_cost_usd con error máximo 5e-16; costo total $0.197. Ningún request pasó de 100k tokens de prompt (máx. 67 930): el tramo alto sigue sin validarse contra Claude Code.
+- Tareas: 10 en 2/2, 16 (security 0) y 19 (contradictory_intact 0) en 0/2, ninguna en 1/2: línea base en el techo, que pesa en la sensibilidad de RULES.md.
+## Accomplished
+- Borradores `specs/r1-refresco/pilot/{preamble.md,limits.yaml}` (D5 y D7 de F3); resultados y tabla por tarea en cost-validation §"Revisión 4"; T8 marcada.
+- Gate: ruff check . verde; uv run pytest -m 'not docker' 355 passed (sin cambios de código desde T9).
+## Next Steps
+- Mergear #37; T38 smoke con Haiku 5.5 (gasta modelo) → T22 → T23.
+## Relevant Files
+- specs/f3-ronda1/cost-validation.md, specs/r1-refresco/pilot/, specs/r1-refresco/tasks.md.
+
 ## 2026-11-03 15:40 Pi — r1-refresco T9: tramo de prompt largo de Haiku 5.5 en el estimador
 
 ## Goal
