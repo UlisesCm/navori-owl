@@ -62,7 +62,7 @@ Estimated LOC: 600
 
 ### M7 — Holdout y pre-registro
 - **A7** [observable] — Suite y holdout validan con el `lib.sh` y los prefijos finales, y `rounds/r1/` carga con corte y pins · `uv run owl validate --suite --holdout` → 15 tareas `ok`; `uv run pytest tests/test_rules.py -q` → pasa
-- [ ] **T22** (R8, R32, R40) — Copiar `owl/verifier/lib.sh` con `cp` a cada `tasks/*/tests/owl-lib.sh` y `holdout/*/tests/owl-lib.sh` (sin `cat`, `grep`, `diff` ni listados de `holdout/`) y correr `owl validate --suite --holdout`; `git diff --stat -- holdout/` muestra solo los tres `tests/owl-lib.sh` · effect: tests · test: tests/test_validate.py::test_static_check_lib_identity_fails_on_drift
+- [x] **T22** (R8, R32, R40) — Copiar `owl/verifier/lib.sh` con `cp` a cada `tasks/*/tests/owl-lib.sh` y `holdout/*/tests/owl-lib.sh` (sin `cat`, `grep`, `diff` ni listados de `holdout/`) y correr `owl validate --suite --holdout`; `git diff --stat -- holdout/` muestra solo los tres `tests/owl-lib.sh` · effect: tests · test: tests/test_validate.py::test_static_check_lib_identity_fails_on_drift
 - [ ] **T23** (R1, R2, R37, R40) — `rounds/r1/RULES.md`, `round.yaml` (modelo, corte, pins, tareas, concurrencia de T38, precios de `specs/r1-refresco/`) y `preamble.md` (D5); `RULES.md` con lo que pide R2, la sensibilidad del piloto de `specs/r1-refresco/`, las declaraciones de riesgo residual RH5 y RH1 y la justificación de todo pin anterior al corte; VISION D4 a Haiku 5.5; el usuario aprueba `RULES.md` antes del commit · effect: docs · test: tests/test_rules.py::test_rules_has_required_sections
 
 ## E3 — Ronda y cierre

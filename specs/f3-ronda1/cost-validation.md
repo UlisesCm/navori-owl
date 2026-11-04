@@ -178,3 +178,16 @@ Todas las tareas quedan en 0/2 o 2/2: ninguna en 1/2. Diez en 2/2 (techo para la
 esperada, porque con la línea base en el techo en 10 de 12 tareas el margen para detectar mejoras en `reward`
 está casi todo en 16 y 19 y en las dimensiones de comportamiento. Costo por trial: $0.0019 a $0.0322, muy por
 debajo de `max_budget_usd` ($5.00).
+
+**Corrección (T22, 2026-11-03): `security` de 16 y `spec_invariant` de 19 son defecto del verifier, no del
+agente.** `owl validate --suite --holdout` dio reward 0 en el oracle de ambas tareas. Sus `test.sh` copiaban
+`tests/exploits/` y `tests/invariant/` con `cp -r` a secas; desde RH3, `owl_begin` deja `/tests` solo para root,
+así que las copias quedaban ilegibles para `node` (`EACCES` en `invariant.log`, fallo de carga en
+`exploits.log`). `f897dc0` había corregido solo `owl_f2p`. Ahora ambas tareas copian con `owl_copy_hidden`
+(`owl/verifier/lib.sh`) y el oracle de las 15 tareas pasa. En el piloto:
+
+- 16 queda **sin medir**: con `f2p` 1 / 1, `security` 0 / 0 lo fija el defecto.
+- 19 sigue en 0/2 por `contradictory_intact` 0 / 0 (dimensión sana); `spec_invariant` 0 / 0 no es evidencia.
+
+La línea base del piloto queda en 10 de 11 tareas medibles en 2/2. `RULES.md` (T23) calcula la sensibilidad
+con esto, o con 16 y 19 re-corridas con el verifier corregido.
