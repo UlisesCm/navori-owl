@@ -1,3 +1,19 @@
+## 2026-11-03 23:30 Pi — f3-ronda1 T22: sync del holdout y fix de tests ocultos ilegibles
+
+## Goal
+Copiar `lib.sh` al holdout con `cp` (sin leerlo) y validar suite + holdout.
+## Discoveries
+- El oracle de 16 y 19 daba reward 0: sus `test.sh` copiaban `exploits/` e `invariant/` con `cp -r` y, con `/tests` go-rwx (RH3), node recibía EACCES. `f897dc0` solo había corregido `owl_f2p`.
+- Consecuencia: en el piloto T8, `security` de 16 y `spec_invariant` de 19 no miden al agente; 19 sigue en 0 por `contradictory_intact`.
+## Accomplished
+- `owl_copy_hidden` en `lib.sh` (copia con modos por default y rechazo de symlinks); `owl_f2p`, 16 y 19 lo usan; 2 pruebas docker; `docs/task-authoring.md`.
+- Copia con `cp` a tasks/* y holdout/* (3 archivos en holdout/); `owl validate --suite --holdout` 15 PASS.
+- Gate: ruff check . verde; uv run pytest (con docker) 445 passed, exit 0.
+## Next Steps
+- Mergear el PR; decidir si re-correr 16 y 19 ×2; T23.
+## Relevant Files
+- owl/verifier/lib.sh, tasks/16-*/tests/test.sh, tasks/19-*/tests/test.sh, tests/test_validate_docker.py, specs/f3-ronda1/cost-validation.md.
+
 ## 2026-11-03 19:30 Pi — f3-ronda1 T38: smoke al corte con Haiku 5.5
 
 ## Goal
