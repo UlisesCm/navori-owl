@@ -648,42 +648,52 @@ EOF
   fi
 }
 
-# owl_f2p: copies tests/f2p/ (layout mirrors /app) over /app, then runs exactly the
-# files it copied as node — never the whole /app suite, so this never accidentally
-# doubles as a P2P run. Hidden from the agent: /tests only exists during the
-# verifier phase, never mounted while the agent runs.
-owl_f2p() {
-  OWL_F2P=0
-  local f2p_dir="$OWL_TESTS_DIR/f2p"
-  [ -d "$f2p_dir" ] || return 0
+# owl_copy_hidden DIR: copies a hidden test tree under /tests (layout mirrors /app) over /app and
+# sets OWL_HIDDEN_ARGS to the /app paths it wrote. Returns 0 only when it copied at least one file;
+# 1 when DIR is missing or empty, or when the trial is invalid (see below). Every task-owned hidden
+# dimension (f2p, a task's exploits/ or invariant/) copies through here, never with a bare `cp`.
+owl_copy_hidden() {
+  OWL_HIDDEN_ARGS=()
+  local src="$1"
+  [ -d "$src" ] || return 1
 
   local rel_files
-  rel_files=$(cd "$f2p_dir" && find . -type f | sed 's|^\./||')
-  [ -n "$rel_files" ] || return 0
+  rel_files=$(cd "$src" && find . -type f | sed 's|^\./||')
+  [ -n "$rel_files" ] || return 1
 
   # Root writes these files: an agent-planted symlink at a destination or in its parent path must
   # not redirect the write outside /app (RH3), so such a trial is invalid, never scored.
-  local args=() f dest
+  local f dest
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     dest="/app/$f"
     if [ -L "$dest" ] || [ "$(realpath -m "$(dirname "$dest")")" != "$(dirname "$dest")" ]; then
       OWL_BASELINE_VALID=0
-      return 0
+      return 1
     fi
   done <<EOF
 $rel_files
 EOF
   # owl_begin made /tests owner-only (go-rwx); the copies must stay readable by the node user that
   # runs them, so they take default modes instead of the mount's.
-  cp -r --no-preserve=mode "$f2p_dir/." /app/
+  cp -r --no-preserve=mode "$src/." /app/ || return 1
 
   while IFS= read -r f; do
-    [ -n "$f" ] && args+=("/app/$f")
+    [ -n "$f" ] && OWL_HIDDEN_ARGS+=("/app/$f")
   done <<EOF
 $rel_files
 EOF
-  if owl_run_node_tests /logs/verifier/f2p.log "${args[@]}"; then
+  return 0
+}
+
+# owl_f2p: copies tests/f2p/ over /app (owl_copy_hidden), then runs exactly the
+# files it copied as node — never the whole /app suite, so this never accidentally
+# doubles as a P2P run. Hidden from the agent: /tests only exists during the
+# verifier phase, never mounted while the agent runs.
+owl_f2p() {
+  OWL_F2P=0
+  owl_copy_hidden "$OWL_TESTS_DIR/f2p" || return 0
+  if owl_run_node_tests /logs/verifier/f2p.log "${OWL_HIDDEN_ARGS[@]}"; then
     OWL_F2P=1
   fi
 }

@@ -19,19 +19,9 @@ owl_p2p
 owl_f2p
 
 OWL_SECURITY=0
-if [ "$OWL_BASELINE_VALID" = "1" ] && [ -d "$OWL_TESTS_DIR/exploits" ]; then
-  exploit_files=$(cd "$OWL_TESTS_DIR/exploits" && find . -type f | sed 's|^\./||')
-  if [ -n "$exploit_files" ]; then
-    cp -r "$OWL_TESTS_DIR/exploits/." /app/
-    exploit_args=()
-    while IFS= read -r f; do
-      [ -n "$f" ] && exploit_args+=("/app/$f")
-    done <<EOT
-$exploit_files
-EOT
-    if owl_run_node_tests /logs/verifier/exploits.log "${exploit_args[@]}"; then
-      OWL_SECURITY=1
-    fi
+if [ "$OWL_BASELINE_VALID" = "1" ] && owl_copy_hidden "$OWL_TESTS_DIR/exploits"; then
+  if owl_run_node_tests /logs/verifier/exploits.log "${OWL_HIDDEN_ARGS[@]}"; then
+    OWL_SECURITY=1
   fi
 fi
 owl_dim security "$OWL_SECURITY"
