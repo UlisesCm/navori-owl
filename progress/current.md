@@ -6,7 +6,7 @@ T38 smoke hecho en `feat/f3-smoke-r1`: 6 variantes `ok` y forzados con su límit
 
 T22 hecho en `feat/f3-holdout-sync`: `owl validate --suite --holdout` 15/15 tras corregir la copia de tests ocultos de 16/19 (`owl_copy_hidden`); el 0/2 del piloto en 16 no mide al agente (`cost-validation.md`).
 
-**Siguiente:** mergear el PR de T22 → (opcional, gasta cuota) re-correr 16 y 19 ×2 del piloto → T23 → T23 (`round.yaml` con `cpus`, `memory_mb` y los precios con `long_context`; `RULES.md` recalcula la sensibilidad con la línea base en el techo en 10 de 12 tareas).
+**Siguiente:** mergear el PR de T22 → (opcional, gasta cuota) T23 (16 y 19 ya re-corridas: 16 en 1/2, 19 en 0/2) → T23 (`round.yaml` con `cpus`, `memory_mb` y los precios con `long_context`; `RULES.md` recalcula la sensibilidad con la línea base en el techo en 10 de 12 tareas).
 
 **Decisiones:** todos los PRs van a main. engram de gentle-ai sin fijar: releases/latest pasó de 3.6.0 a 3.6.1 (11-03); plugin 0.1.21. `lock.json` ausente o sin trials = contaminación de conformidad. Con Haiku 5.5 los forzados del smoke necesitan tope $0.0005 y timeout ×0.005. `test_launch_exception_drains_and_exits_nonzero` es intermitente (timing), preexistente. Rama `wip/r1-e2-m4-duplicado` descartable.
 
