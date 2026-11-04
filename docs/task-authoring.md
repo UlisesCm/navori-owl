@@ -232,7 +232,10 @@ conviertas una señal no gateante en gate por accidente.
   ejemplos de `instruction.md` (specificity) y fallar sobre el fixture sin cambios (nop = 0).
 - **`tests/exploits/`** (opcional): entradas o scripts ocultos que tu `test.sh` ejecuta contra el
   código del agente para medir una propiedad (p. ej. una dimensión propia). Aplica las reglas de
-  integridad de la sección 12 a todo lo que ejecutes aquí.
+  integridad de la sección 12 a todo lo que ejecutes aquí. Copia todo árbol oculto sobre `/app` con
+  `owl_copy_hidden "$OWL_TESTS_DIR/<dir>"` (deja en `OWL_HIDDEN_ARGS` las rutas copiadas), nunca con
+  `cp -r`: `owl_begin` deja `/tests` solo para root y una copia a secas resulta ilegible para `node`
+  (`EACCES`, reward 0 aun con una solución correcta); el helper además rechaza destinos symlink.
 - **`tests/fix.patch`** (opcional): un parche oculto que tu `test.sh` aplica a una copia para
   comparar comportamientos. Nunca dentro de `/app`.
 - Todo archivo bajo `tests/` (incluidos `f2p/`, `exploits/`, `fix.patch`) lleva el canary

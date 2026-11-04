@@ -129,19 +129,9 @@ owl_dim contradictory_red "$contradictory_red"
 
 # spec_invariant: hidden tests, copied over /app only now (like f2p), run as node (D6.2).
 spec_invariant=0
-if [ "$OWL_BASELINE_VALID" = "1" ] && [ -d "$OWL_TESTS_DIR/invariant" ]; then
-  inv_files=$(cd "$OWL_TESTS_DIR/invariant" && find . -type f | sed 's|^\./||')
-  if [ -n "$inv_files" ]; then
-    cp -r "$OWL_TESTS_DIR/invariant/." /app/
-    inv_args=()
-    while IFS= read -r f; do
-      [ -n "$f" ] && inv_args+=("/app/$f")
-    done <<EOT
-$inv_files
-EOT
-    if owl_run_node_tests /logs/verifier/invariant.log "${inv_args[@]}"; then
-      spec_invariant=1
-    fi
+if [ "$OWL_BASELINE_VALID" = "1" ] && owl_copy_hidden "$OWL_TESTS_DIR/invariant"; then
+  if owl_run_node_tests /logs/verifier/invariant.log "${OWL_HIDDEN_ARGS[@]}"; then
+    spec_invariant=1
   fi
 fi
 owl_dim spec_invariant "$spec_invariant"

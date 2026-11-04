@@ -1633,6 +1633,37 @@ def test_guard_file_is_root_owned_and_not_writable_by_the_agent(sealed_container
         assert result.returncode != 0, attempt
 
 
+# Covers: R6, R10, R12
+def test_hidden_task_tests_are_readable_by_node(sealed_container: str) -> None:
+    """A task-owned hidden tree (tasks 16 exploits/, 19 invariant/) copies through owl_copy_hidden:
+    after owl_begin makes /tests owner-only, a bare `cp -r` left root-only copies and node failed
+    with EACCES (pilot T8, tasks 16 and 19 at 0/2). The copy must run, and pass, as node."""
+    _put(sealed_container, f"/tests/exploits/{_F2P_PROBE_REL}", _F2P_PASSING, user="root")
+    _copy_lib(sealed_container)
+    script = _CHAIN + (
+        'owl_copy_hidden "$OWL_TESTS_DIR/exploits"; echo COPIED=$?\n'
+        'echo ARGS="${OWL_HIDDEN_ARGS[*]}"\n'
+        'owl_run_node_tests /logs/verifier/exploits.log "${OWL_HIDDEN_ARGS[@]}"; echo RAN=$?\n'
+    )
+    verdict = _verdicts(_docker_exec(sealed_container, script))
+    log = _log(sealed_container, "exploits")
+    assert verdict["COPIED"] == "0" and verdict["ARGS"] == f"/app/{_F2P_PROBE_REL}", verdict
+    assert verdict["RAN"] == "0" and "EACCES" not in log, log
+
+
+# Covers: R3, R6, R12
+def test_hidden_task_tests_symlinked_destination_invalidates(sealed_container: str) -> None:
+    """owl_copy_hidden keeps the RH3 symlink refusal for every hidden tree, not only f2p/."""
+    _put(sealed_container, f"/tests/exploits/{_F2P_PROBE_REL}", _F2P_PASSING, user="root")
+    _docker_exec(sealed_container, "printf 'KEEP\\n' > /tmp/target && chown node:node /tmp/target")
+    _docker_exec(sealed_container, f"ln -s /tmp/target /app/{_F2P_PROBE_REL}", user="node")
+    _copy_lib(sealed_container)
+    script = _CHAIN + 'owl_copy_hidden "$OWL_TESTS_DIR/exploits"; echo COPIED=$?\necho VALID=$OWL_BASELINE_VALID\n'
+    verdict = _verdicts(_docker_exec(sealed_container, script))
+    assert (verdict["COPIED"], verdict["VALID"]) == ("1", "0"), verdict
+    assert _docker_exec(sealed_container, "cat /tmp/target") == "KEEP\n"
+
+
 # Covers: R6, R10
 def test_guard_hang_is_bounded_by_the_timeout(sealed_container: str) -> None:
     """A payload that never lets the file finish (here a timer that keeps the loop alive) is cut
